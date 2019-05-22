@@ -8,6 +8,8 @@ import signal
 import sys
 import telnetlib
 
+from qrz import *
+
 
 
 RBN_HOST = "telnet.reversebeacon.net"
@@ -15,6 +17,10 @@ RBN_PORT = 7000
 MY_CALLSIGN = "K6ZX"
 
 TELNETLIB_DEBUG_LEVEL = 0
+
+QRZ_USERNAME   = 'K6ZX'
+QRZ_PASSWORD   = 'Sean!12233'
+
 
 telnetInstance = None
 
@@ -49,9 +55,9 @@ def parseArguments():
                         type=int, help='DE ITU Zone')
     parser.add_argument('--dx_itu', action='store', dest='dxITU',
                         type=int, help='DX ITU Zone')
-    parser.add_argument('--de_cq', action='store', dest='deCQ',
+    parser.add_argument('--de_cq', action='append', dest='deCQ',
                         type=int, help='DE CQ Zone')
-    parser.add_argument('--dx_cq', action='store', dest='dxCQ',
+    parser.add_argument('--dx_cq', action='append', dest='dxCQ',
                         type=int, help='DX CQ Zone')
     parser.add_argument('--min_wpm', action='store', dest='minWPM',
                         type=int, default=0, help='Minimum CW WPM to show')
@@ -84,8 +90,14 @@ def processArgs(args):
         a['band'] = args.band
     a['deITU'] = args.deITU
     a['dxITU'] = args.dxITU
-    a['deCQ'] = args.deCQ
-    a['dxCQ'] = args.dxCQ
+    if not args.deCQ:
+        a['deCQ'] = [*range(1, 41, 1)]
+    else:
+        a['deCQ'] = args.deCQ
+    if not args.dxCQ:
+        a['dxCQ'] = [*range(1, 41, 1)]
+    else:
+        a['dxCQ'] = args.dxCQ
     a['minWPM'] = args.minWPM
     a['maxWPM'] = args.maxWPM
     if not args.mode:
@@ -174,9 +186,70 @@ def filterWPM(args, wpmStr):
         result = True
     
     return result
+
+
+def filterCQZones(args, callData):
+    result = False
+
+    if 'cqzone' in callData:
+        print(f"filterCQZones() {args['dxCQ']}")
+        print(f"\tcq zone: {callData['cqzone']}")
+
+        if callData['cqzone'] in args['dxCQ']:
+            result = True
+
+    return result
+
+
+
+def filter(progArgs, qrz, line):
+    lineStr = line.decode('utf-8').rstrip()
+
+    l = lineStr.split()
+
+    if len(l) > 7:
+        # print("-------------------------------")
+        # print(f"split: {l}")
+
+        deCall = l[2].split('-')[0]
+        freq = float(l[3])
+        dxCall = l[4]
+        mode = l[5]
+        snr = l[6]
+        wpm = l[8]
+        xmsn = l[10]
+        # time = l[11]
+        time = l[(len(l) - 1)]
+
+        # print(f"DEBUG: {dxCall} de {deCall}, freq {freq}, {mode}, {snr} dB, "
+        #       f"{wpm} WPM, {time}Z")
+
+        try:
+            dxCallData = qrz.callsignData(dxCall, quiet=True)
+            callsignFound = True
+            # print(f"\tDEBUG: call data: {dxCallData}")
+        except CallsignNotFound:
+            callsignFound = False
+        except Exception as e:
+            print(f"filter() caught exception '{e}' for callsign {dxCall}")
+            callsignFound = False
+
+        if (callsignFound and
+            filterBand(progArgs, freq) and
+            filterMode(progArgs, mode) and
+            filterWPM(progArgs, wpm) and
+            filterCQZones(progArgs, dxCallData)
+            ):
+            retStr = (f"{dxCall:6s} de {deCall:6s}  {freq:7.1f} MHz  {mode}  "
+                      f"{snr:>2s} dB  {wpm:>2s} WPM  {time}")
+        else:
+            retStr = ""
+
+        return retStr
+
     
 
-def filter(progArgs, line):
+def filter1(progArgs, qrz, line):
     lineStr = line.decode('utf-8').rstrip()
 
     # patternStr = (f"DX\s+de\s+([a-zA-Z0-9]+)-#:\s+([0-9.]+)\s+"
@@ -187,18 +260,21 @@ def filter(progArgs, line):
     DX\s+de\s+
     ([a-zA-Z0-9/\-\/]+)-\#:\s+                 # receiving (de) station
     ([0-9.]+)\s+                               # frequency
-    ([a-zA-Z0-9/\-\/]+)\s+                     # xmit (dx) station
+    ([a-zA-Z0-9\-\/]+)\s+                      # xmit (dx) station
     ([a-zA-Z0-9]+)\s+                          # mode
-    ([0-9]+)\s+dB\s+                           # SNR
+    ([-+]?[0-9]+)\s+dB\s+                      # SNR
     ([0-9]+)\s+WPM|BPS\s+                      # words/min or bits/sec
     [a-zA-Z0-9]+\s+                            # type of 'message' received
     ([0-9]+)Z                                  # time
     """, re.VERBOSE)
     
     match = pattern.match(lineStr)
+
+    l = lineStr.split()
+    print(f"split: {l}")
     
     if match:
-        # print("-------------------------------")
+        print("-------------------------------")
         # print(f"\tline:  {lineStr}")
 
         deCall = match.group(1)
@@ -214,14 +290,27 @@ def filter(progArgs, line):
         # print(f"\tDEBUG: {dxCall} de {deCall}, freq {freq}, {mode}, {snr} dB, "
         #       f"{wpm} WPM, {gmt}Z")
 
-        if (filterBand(progArgs, freq) and
+        try:
+            dxCallData = qrz.callsignData(dxCall, quiet=True)
+            callsignFound = True
+            # print(f"\tDEBUG: call data: {dxCallData}")
+        except CallsignNotFound:
+            callsignFound = False
+        except Exception as e:
+            print(f"filter() caught exception '{e}' for callsign {dxCall}")
+            callsignFound = False
+
+        if (callsignFound and
+            filterBand(progArgs, freq) and
             filterMode(progArgs, mode) and
-            filterWPM(progArgs, wpm)):
+            filterWPM(progArgs, wpm) and
+            filterCQZones(progArgs, dxCallData)):
             retStr = (f"{dxCall:6s} de {deCall:6s}  {freq:7.1f} MHz  {mode}  "
                       f"{snr:>2s} dB  {wpm:>2s} WPM  {gmt}Z")
         else:
             retStr = ""
-            # print(f"line:  {lineStr}")
+            print(f"line:  {lineStr}")
+            print(f"match: {match.group(0)}")
     else:
         retStr = lineStr
         
@@ -252,16 +341,17 @@ def main():
     loginStr = (MY_CALLSIGN + "\n").encode('ascii')
     tn.write(loginStr)
 
+    qrz = QRZ(QRZ_USERNAME, QRZ_PASSWORD)
     
     # spinner = spinningCursor()
     while True:
         rawline = tn.read_until(b"\r\n")
-        line = filter(progArgs, rawline)
+        line = filter(progArgs, qrz, rawline)
         if line:
             # print("\n" + line, end='\r', flush=True)
             print(line)
-        # else:
-        #     print(".", end="", flush=True)
+        else:
+            print(".", end="", flush=True)
 
 
 
