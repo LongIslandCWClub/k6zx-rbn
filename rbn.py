@@ -192,8 +192,8 @@ def filterCQZones(args, callData):
     result = False
 
     if 'cqzone' in callData:
-        print(f"filterCQZones() {args['dxCQ']}")
-        print(f"\tcq zone: {callData['cqzone']}")
+        # print(f"filterCQZones() {args['dxCQ']}")
+        # print(f"\tcq zone: {callData['cqzone']}")
 
         if callData['cqzone'] in args['dxCQ']:
             result = True
@@ -343,15 +343,29 @@ def main():
 
     qrz = QRZ(QRZ_USERNAME, QRZ_PASSWORD)
     
-    # spinner = spinningCursor()
+    dots = 0
+    columns, rows = os.get_terminal_size(0)
+    columns -= 10
     while True:
         rawline = tn.read_until(b"\r\n")
         line = filter(progArgs, qrz, rawline)
         if line:
-            # print("\n" + line, end='\r', flush=True)
+            if dots > 0:
+                # goto to beginning of line and clear the line
+                print("", end="\r")            # carriage return
+                sys.stdout.write("\033[K")     # clear to eol
+                dots = 0
+                
             print(line)
         else:
-            print(".", end="", flush=True)
+            if dots >= columns:
+                # goto to beginning of line and clear the line
+                print("", end="\r")            # carriage return
+                sys.stdout.write("\033[K")     # clear to eol
+                dots = 0
+            else:
+                print(".", end="", flush=True)
+                dots += 1
 
 
 
