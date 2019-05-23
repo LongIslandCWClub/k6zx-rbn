@@ -212,10 +212,11 @@ def filterCQZones(args, callData):
         # need to convert from string to int to match zone types in the
         # progArgs dxCQ list
         zone = int(callData['cqzone'])
-        
-        logging.warning(f"calldata cqzone type {type(callData['cqzone'])}, "
-                        f"args dxCQ type {type(args['dxCQ'])}, "
-                        f"args elem type {type(args['dxCQ'][0])}")
+
+        if args['logging']:
+            logging.warning(f"calldata cqzone type {type(callData['cqzone'])}, "
+                            f"args dxCQ type {type(args['dxCQ'])}, "
+                            f"args elem type {type(args['dxCQ'][0])}")
         
         if zone in args['dxCQ']:
             result = True
@@ -239,20 +240,23 @@ def filter(progArgs, qrz, line):
 
     l = lineStr.split()
 
-    if len(l) > 7:
+    if len(l) == 12:
         if progArgs['logging']:
             logging.warning("-------------------------------")
             logging.warning(f"split: {l}")
 
-        deCall = l[2].split('-')[0]
-        freq = float(l[3])
-        dxCall = l[4]
-        mode = l[5]
-        snr = l[6]
-        wpm = l[8]
-        xmsn = l[10]
-        # time = l[11]
-        time = l[(len(l) - 1)]
+        try:
+            deCall = l[2].split('-')[0]
+            freq = float(l[3])
+            dxCall = l[4]
+            mode = l[5]
+            snr = l[6]
+            wpm = l[8]
+            xmsn = l[10]
+            time = l[(len(l) - 1)]
+        except ValueError as e:
+            print(f"error {e}")
+            print(f"line: {l}")
 
         if progArgs['logging']:
             logging.warning(f"DEBUG: {dxCall} de {deCall}, freq {freq}, {mode}, "
