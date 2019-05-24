@@ -1,6 +1,8 @@
 certifi==2019.3.9
 chardet==3.0.4
 ConfigArgParse==0.14.0
+geographiclib==1.49
+geopy==1.19.0
 idna==2.8
 requests==2.22.0
 urllib3==1.25.2

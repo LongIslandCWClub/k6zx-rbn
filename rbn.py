@@ -2,6 +2,7 @@
 
 
 import configargparse
+from geopy import distance
 import logging
 import os
 import re
@@ -22,8 +23,13 @@ TELNETLIB_DEBUG_LEVEL = 0
 QRZ_USERNAME   = 'K6ZX'
 QRZ_PASSWORD   = 'Sean!12233'
 
+BREA_POSITION = (33.9165, -117.9003)
 
 telnetInstance = None
+
+
+lastCall = ""
+lastTime = ""
 
 
 def signalHandler(signum, frame):
@@ -236,6 +242,9 @@ def filterCQZones(args, callData):
 
 
 def filter(progArgs, qrz, line):
+    global lastCall
+    global lastTime
+    
     lineStr = line.decode('utf-8').rstrip()
 
     l = lineStr.split()
@@ -265,11 +274,12 @@ def filter(progArgs, qrz, line):
         try:
             dxCallData = qrz.callsignData(dxCall, quiet=True)
             callsignFound = True
-            # print(f"\tDEBUG: call data: {dxCallData}")
+            if progArgs['logging']:
+                logging.warning(f"callsignData: {dxCallData}")
         except CallsignNotFound:
             callsignFound = False
         except Exception as e:
-            print(f"filter() caught exception '{e}' for callsign {dxCall}")
+            print(f"\nfilter() caught exception '{e}' for callsign {dxCall}")
             callsignFound = False
 
         if (callsignFound and
@@ -280,6 +290,27 @@ def filter(progArgs, qrz, line):
             ):
             retStr = (f"{dxCall:6s} de {deCall:6s}  {freq:7.1f} MHz  {mode}  "
                       f"{snr:>2s} dB  {wpm:>2s} WPM  {time}")
+
+            if 'lat' in dxCallData and 'lon' in dxCallData:
+                d = distance.distance((dxCallData['lat'], dxCallData['lon']),
+                                      BREA_POSITION).miles
+                retStr += f"  dist {round(d):5} mi"
+
+            if 'state' in dxCallData:
+                retStr += f"  {dxCallData['state']}"
+            elif 'country' in dxCallData:
+                retStr += f"  {dxCallData['country']}"
+
+            if (lastCall == dxCall) and (lastTime == time):
+                retStr = '*'
+
+            lastCall = dxCall
+            lastTime = time
+
+            if progArgs['logging']:
+                logging.warning(f"call {dxCall} - {lastCall} "
+                                f"time {time} - {lastTime}")
+                
         else:
             retStr = ""
 
@@ -389,7 +420,23 @@ def main():
     while True:
         rawline = tn.read_until(b"\r\n")
         line = filter(progArgs, qrz, rawline)
-        if line:
+        if line == '*' or line == "":
+            if dots >= columns:
+                # goto to beginning of line and clear the line
+                print("", end="\r")            # carriage return
+                sys.stdout.write("\033[K")     # clear to eol
+                dots = 0
+            else:
+                if line == "*":
+                    ch = "*"
+                else:
+                    ch = "."
+                    
+                print(ch, end="", flush=True)
+                dots += 1
+            
+        #if line:
+        elif line:
             if dots > 0:
                 # goto to beginning of line and clear the line
                 print("", end="\r")            # carriage return
@@ -397,15 +444,15 @@ def main():
                 dots = 0
                 
             print(line)
-        else:
-            if dots >= columns:
-                # goto to beginning of line and clear the line
-                print("", end="\r")            # carriage return
-                sys.stdout.write("\033[K")     # clear to eol
-                dots = 0
-            else:
-                print(".", end="", flush=True)
-                dots += 1
+        # else:
+        #     if dots >= columns:
+        #         # goto to beginning of line and clear the line
+        #         print("", end="\r")            # carriage return
+        #         sys.stdout.write("\033[K")     # clear to eol
+        #         dots = 0
+        #     else:
+        #         print(".", end="", flush=True)
+        #         dots += 1
 
 
 
