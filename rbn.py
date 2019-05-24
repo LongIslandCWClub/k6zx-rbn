@@ -60,6 +60,10 @@ def parseArguments():
                         type=int, default = 0, help='Enable program logging')
     parser.add_argument('--telnetdebug', action='store', dest='telnetdebug',
                         type=int, default = 0, help='Enable telnetlib debugging')
+    parser.add_argument('--de_maid', action='append', dest='deMaid',
+                        help='DE Maidenhead squares')
+    parser.add_argument('--dx_maid', action='append', dest='dxMaid',
+                        help='DX Maidenhead squares')
     parser.add_argument('--de_itu', action='store', dest='deITU',
                         type=int, help='DE ITU Zone')
     parser.add_argument('--dx_itu', action='store', dest='dxITU',
@@ -97,6 +101,14 @@ def processArgs(args):
                      '6m']
     else:
         a['band'] = args.band
+    if not args.deMaid:
+        a['deMaid'] = ['all']
+    else:
+        a['deMaid'] = args.deMaid
+    if not args.dxMaid:
+        a['dxMaid'] = ['all']
+    else:
+        a['dxMaid'] = args.dxMaid
     a['deITU'] = args.deITU
     a['dxITU'] = args.dxITU
     if not args.deCQ:
@@ -234,11 +246,25 @@ def filterCQZones(args, callData):
                 pass
     else:
         result = True          # this call doesn't have a CQ Zone so print it
+        result = False         # on second thought too many stations w/o zone
         if args['logging']:
             logging.warning(f"filterCQZones(): station has no 'cqzone'")
         
     return result
 
+
+def filterMaidenhead(args, callData):
+    result = False
+
+    if 'grid' in callData:
+        grid = callData['grid'][:2]
+        if grid in args['dxMaid']:
+            result = True
+    else:
+        if args['logging']:
+            logging.warning(f"filterMaidenhead() {callData['call']} has no grid")
+
+    return result
 
 
 def filter(progArgs, qrz, line):
@@ -276,6 +302,10 @@ def filter(progArgs, qrz, line):
             callsignFound = True
             if progArgs['logging']:
                 logging.warning(f"callsignData: {dxCallData}")
+
+            if 'grid' not in dxCallData:
+                logging.warning(f"{dxCallData['call']} has no grid in QRZ")
+                
         except CallsignNotFound:
             callsignFound = False
         except Exception as e:
@@ -286,7 +316,7 @@ def filter(progArgs, qrz, line):
             filterBand(progArgs, freq) and
             filterMode(progArgs, mode) and
             filterWPM(progArgs, wpm) and
-            filterCQZones(progArgs, dxCallData)
+            filterMaidenhead(progArgs, dxCallData)
             ):
             retStr = (f"{dxCall:6s} de {deCall:6s}  {freq:7.1f} MHz  {mode}  "
                       f"{snr:>2s} dB  {wpm:>2s} WPM  {time}")
