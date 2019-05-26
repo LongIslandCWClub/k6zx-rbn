@@ -37,6 +37,7 @@ def signalHandler(signum, frame):
     
     print(f"\nTerminating connection to: {RBN_HOST}\n")
     telnetInstance.close()
+
     sys.exit(0)
 
 
@@ -171,7 +172,7 @@ def filterBand(args, freq):
             result = True
 
     if args['logging'] and result == False:
-        logging.warning("filterBand(): cfg {args['band']}, {freq}")
+        logging.info("filterBand(): cfg {args['band']}, {freq}")
         
     return result
 
@@ -199,7 +200,7 @@ def filterMode(args, mode):
         result = True
 
     if args['logging'] and result == False:
-        logging.warning(f"filterMode(): cfg {args['mode']}, mode {mode}")
+        logging.info(f"filterMode(): cfg {args['mode']}, mode {mode}")
         
     return result
 
@@ -214,8 +215,8 @@ def filterWPM(args, wpmStr):
         result = True
     
     if args['logging'] and result == False:
-        logging.warning(f"filterWPM(): min {args['minWPM']}, max {args['maxWPM']} "
-                        f"WPM {wpm}")
+        logging.info(f"filterWPM(): min {args['minWPM']}, max {args['maxWPM']} "
+                     f"WPM {wpm}")
         
     return result
 
@@ -232,23 +233,23 @@ def filterCQZones(args, callData):
         zone = int(callData['cqzone'])
 
         if args['logging']:
-            logging.warning(f"calldata cqzone type {type(callData['cqzone'])}, "
-                            f"args dxCQ type {type(args['dxCQ'])}, "
-                            f"args elem type {type(args['dxCQ'][0])}")
+            logging.info(f"calldata cqzone type {type(callData['cqzone'])}, "
+                         f"args dxCQ type {type(args['dxCQ'])}, "
+                         f"args elem type {type(args['dxCQ'][0])}")
         
         if zone in args['dxCQ']:
             result = True
         else:
             if args['logging']:
-                logging.warning(f"filterCQZones(): cfg CQ zone {args['dxCQ']} "
-                                f"CQ zone {zone}")
+                logging.info(f"filterCQZones(): cfg CQ zone {args['dxCQ']} "
+                             f"CQ zone {zone}")
             else:
                 pass
     else:
         result = True          # this call doesn't have a CQ Zone so print it
         result = False         # on second thought too many stations w/o zone
         if args['logging']:
-            logging.warning(f"filterCQZones(): station has no 'cqzone'")
+            logging.info(f"filterCQZones(): station has no 'cqzone'")
         
     return result
 
@@ -262,7 +263,7 @@ def filterMaidenhead(args, callData):
             result = True
     else:
         if args['logging']:
-            logging.warning(f"filterMaidenhead() {callData['call']} has no grid")
+            logging.info(f"filterMaidenhead() {callData['call']} has no grid")
 
     return result
 
@@ -277,8 +278,8 @@ def filter(progArgs, qrz, line):
 
     if len(l) == 12:
         if progArgs['logging']:
-            logging.warning("-------------------------------")
-            logging.warning(f"split: {l}")
+            logging.info("-------------------------------")
+            logging.info(f"split: {l}")
 
         try:
             deCall = l[2].split('-')[0]
@@ -294,23 +295,30 @@ def filter(progArgs, qrz, line):
             print(f"line: {l}")
 
         if progArgs['logging']:
-            logging.warning(f"DEBUG: {dxCall} de {deCall}, freq {freq}, {mode}, "
-                            f"{snr} dB, {wpm} WPM, {time}Z")
+            logging.info(f"DEBUG: {dxCall} de {deCall}, freq {freq}, {mode}, "
+                         f"{snr} dB, {wpm} WPM, {time}Z")
 
-        try:
-            dxCallData = qrz.callsignData(dxCall, quiet=True)
+        if qrz.localCallsignDataExists(dxCall):
+            dxCallData = qrz.getLocalCallsignData(dxCall)
             callsignFound = True
             if progArgs['logging']:
-                logging.warning(f"callsignData: {dxCallData}")
+                logging.info(f"filter() ")
+        else:
+            try:
+                dxCallData = qrz.callsignData(dxCall, quiet=True)
+                callsignFound = True
+                qrz.setLocalCallsignData(dxCall, dxCallData)
+                if progArgs['logging']:
+                    logging.info(f"callsignData: {dxCallData}")
 
-            if 'grid' not in dxCallData:
-                logging.warning(f"{dxCallData['call']} has no grid in QRZ")
+                if 'grid' not in dxCallData:
+                    logging.info(f"{dxCallData['call']} has no grid in QRZ")
                 
-        except CallsignNotFound:
-            callsignFound = False
-        except Exception as e:
-            print(f"\nfilter() caught exception '{e}' for callsign {dxCall}")
-            callsignFound = False
+            except CallsignNotFound:
+                callsignFound = False
+            except Exception as e:
+                print(f"\nfilter() caught exception '{e}' for callsign {dxCall}")
+                callsignFound = False
 
         if (callsignFound and
             filterBand(progArgs, freq) and
@@ -338,78 +346,15 @@ def filter(progArgs, qrz, line):
             lastTime = time
 
             if progArgs['logging']:
-                logging.warning(f"call {dxCall} - {lastCall} "
-                                f"time {time} - {lastTime}")
+                logging.info(f"call {dxCall} - {lastCall} "
+                             f"time {time} - {lastTime}")
                 
         else:
             retStr = ""
 
         return retStr
 
-    
 
-def filter1(progArgs, qrz, line):
-    lineStr = line.decode('utf-8').rstrip()
-
-    pattern = re.compile(r"""
-    DX\s+de\s+
-    ([a-zA-Z0-9/\-\/]+)-\#:\s+                 # receiving (de) station
-    ([0-9.]+)\s+                               # frequency
-    ([a-zA-Z0-9\-\/]+)\s+                      # xmit (dx) station
-    ([a-zA-Z0-9]+)\s+                          # mode
-    ([-+]?[0-9]+)\s+dB\s+                      # SNR
-    ([0-9]+)\s+WPM|BPS\s+                      # words/min or bits/sec
-    [a-zA-Z0-9]+\s+                            # type of 'message' received
-    ([0-9]+)Z                                  # time
-    """, re.VERBOSE)
-    
-    match = pattern.match(lineStr)
-
-    l = lineStr.split()
-    print(f"split: {l}")
-    
-    if match:
-        print("-------------------------------")
-        # print(f"\tline:  {lineStr}")
-
-        deCall = match.group(1)
-        freq = float(match.group(2))
-        dxCall = match.group(3)
-        mode = match.group(4)
-        snr = match.group(5)
-        wpm = match.group(6)
-        gmt = match.group(7)
-
-        # print(f"match: {match.group(0)}")
-        
-        # print(f"\tDEBUG: {dxCall} de {deCall}, freq {freq}, {mode}, {snr} dB, "
-        #       f"{wpm} WPM, {gmt}Z")
-
-        try:
-            dxCallData = qrz.callsignData(dxCall, quiet=True)
-            callsignFound = True
-            # print(f"\tDEBUG: call data: {dxCallData}")
-        except CallsignNotFound:
-            callsignFound = False
-        except Exception as e:
-            print(f"filter() caught exception '{e}' for callsign {dxCall}")
-            callsignFound = False
-
-        if (callsignFound and
-            filterBand(progArgs, freq) and
-            filterMode(progArgs, mode) and
-            filterWPM(progArgs, wpm) and
-            filterCQZones(progArgs, dxCallData)):
-            retStr = (f"{dxCall:6s} de {deCall:6s}  {freq:7.1f} MHz  {mode}  "
-                      f"{snr:>2s} dB  {wpm:>2s} WPM  {gmt}Z")
-        else:
-            retStr = ""
-            print(f"line:  {lineStr}")
-            print(f"match: {match.group(0)}")
-    else:
-        retStr = lineStr
-        
-    return retStr
 
 
 def main():
@@ -421,7 +366,8 @@ def main():
     print(f"DEBUG - progArgs: {progArgs}")
 
     if progArgs['logging']:
-        logging.basicConfig(filename='rbn.log', filemode='w')
+        logging.basicConfig(filename='rbn.log', filemode='w',
+                            level=logging.INFO)
 
     # tn = telnetlib.Telnet(RBN_HOST, RBN_PORT)
     tn = telnetlib.Telnet()
@@ -442,7 +388,7 @@ def main():
     loginStr = (MY_CALLSIGN + "\n").encode('ascii')
     tn.write(loginStr)
 
-    qrz = QRZ(QRZ_USERNAME, QRZ_PASSWORD)
+    qrz = QRZ(QRZ_USERNAME, QRZ_PASSWORD, progArgs['logging'])
     
     dots = 0
     columns, rows = os.get_terminal_size(0)

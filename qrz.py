@@ -3,7 +3,11 @@
 # qrz.py - Functions to query the QRZ.com database
 
 
+import logging
+import os
+import re
 import requests
+import shelve
 import xmltodict
 
 
@@ -23,12 +27,23 @@ class QRZ:
     QRZ_BASE_URL = 'http://xmldata.qrz.com/xml/current/'
     
 
-    def __init__(self, username, password):
+    def __init__(self, username, password, logging):
         self._session = None
         self._session_key = None
 
         self.username = username
         self.password = password
+        self.logging = logging
+
+        # open shelve file with QRZ callsign info storage
+        self.QRZ_SHELVE_FILE = os.path.join(os.environ['HOME'],
+                                            'amateur-radio/rbnData.db')
+        self.qrzLocalData = shelve.open(self.QRZ_SHELVE_FILE)
+
+
+    # Class destructor, need to close the shelve file
+    def __del__(self):
+        self.qrzLocalData.close()
 
 
     def _get_session(self):
@@ -50,8 +65,16 @@ class QRZ:
         if self._session_key is None:
             self._get_session()
 
-        url = self.QRZ_BASE_URL + f'?s={self._session_key}&callsign={callsign}'
+        # search for '/' in callsigns and effectively remove it from
+        # the callsign submitted to qrz.com
+        match = re.search(r'([0-9a-zA-Z]+)/*', callsign)
+        if match:
+            callsign = match.group(1)
+            
+        # print(f'callsignData: call: {callsign}')
 
+        url = self.QRZ_BASE_URL + '?s={}&callsign={}'.format(self._session_key,
+                                                             callsign)
         r = self._session.get(url)
 
         if r.status_code != 200:
@@ -86,5 +109,30 @@ class QRZ:
 
         raise Exception("Unhandled Error during Query")
 
+
+    def localCallsignDataExists(self, callsign):
+        result = False
+        
+        if callsign in self.qrzLocalData:
+            result = True
+
+        return result
     
             
+            
+    def getLocalCallsignData(self, callsign):
+        if self.logging:
+            # logging.info(f"getLocalCallsignData() {self.qrzLocalData[callsign]}")
+            logging.info(f"getLocalCallsignData() get call {callsign}")
+        return self.qrzLocalData[callsign]
+
+
+    def setLocalCallsignData(self, callsign, data):
+        if self.logging:
+            # logging.info(f"setLocalCallsignData() {data}")
+            logging.info(f"setLocalCallsignData() set data for {callsign}")
+        self.qrzLocalData[callsign] = data
+        
+
+    def getLocalCallsignDataKeys(self):
+        return list(self.qrzLocalData.keys())
