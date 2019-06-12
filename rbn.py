@@ -113,11 +113,11 @@ def processArgs(args):
     a['deITU'] = args.deITU
     a['dxITU'] = args.dxITU
     if not args.deCQ:
-        a['deCQ'] = [*range(1, 41, 1)]
+        a['deCQ'] = ['all']
     else:
         a['deCQ'] = args.deCQ
     if not args.dxCQ:
-        a['dxCQ'] = [*range(1, 41, 1)]
+        a['dxCQ'] = ['all']
     else:
         a['dxCQ'] = args.dxCQ
     a['minWPM'] = args.minWPM
