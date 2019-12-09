@@ -355,47 +355,27 @@ def filter(progArgs, qrz, line):
         return retStr
 
 
-
-
-def main():
-    global telnetInstance
-
-    args = parseArguments()
-
-    progArgs = processArgs(args)
-    print(f"DEBUG - progArgs: {progArgs}")
-
-    if progArgs['logging']:
-        logging.basicConfig(filename='rbn.log', filemode='w',
-                            level=logging.INFO)
-
-    # tn = telnetlib.Telnet(RBN_HOST, RBN_PORT)
-    tn = telnetlib.Telnet()
-    telnetInstance = tn
-
-    tn.set_debuglevel(progArgs['telnetdebug'])
-
-    for x in range(10):
-        try:
-            tn.open(RBN_HOST, RBN_PORT, 10)
-            print(f"telnet connection established {RBN_HOST}:"
-                  f"{RBN_PORT}")
-            break
-        except socket.timeout:
-            print(f"telnet connection timed out, retrying...")
-            
+def rbnLogin(tn):
+    tn.open(RBN_HOST, RBN_PORT, 10)
+    
     tn.read_until(b"Please enter your call: ")
     loginStr = (MY_CALLSIGN + "\n").encode('ascii')
     tn.write(loginStr)
 
-    qrz = QRZ(QRZ_USERNAME, QRZ_PASSWORD, progArgs['logging'])
-    
+    tn.read_until(b"Local users", timeout=20)
+    print("Connection established...")
+
+
+def rbnProcess(tn, args):
     dots = 0
     columns, rows = os.get_terminal_size(0)
     columns -= 10
+
+    qrz = QRZ(QRZ_USERNAME, QRZ_PASSWORD, args['logging'])
+    
     while True:
         rawline = tn.read_until(b"\r\n")
-        line = filter(progArgs, qrz, rawline)
+        line = filter(args, qrz, rawline)
         if line == '*' or line == "":
             if dots >= columns:
                 # goto to beginning of line and clear the line
@@ -410,8 +390,6 @@ def main():
                     
                 print(ch, end="", flush=True)
                 dots += 1
-            
-        #if line:
         elif line:
             if dots > 0:
                 # goto to beginning of line and clear the line
@@ -420,16 +398,40 @@ def main():
                 dots = 0
                 
             print(line)
-        # else:
-        #     if dots >= columns:
-        #         # goto to beginning of line and clear the line
-        #         print("", end="\r")            # carriage return
-        #         sys.stdout.write("\033[K")     # clear to eol
-        #         dots = 0
-        #     else:
-        #         print(".", end="", flush=True)
-        #         dots += 1
+            
 
+
+def main():
+    global telnetInstance
+
+    args = parseArguments()
+
+    progArgs = processArgs(args)
+    print(f"DEBUG - progArgs: {progArgs}")
+
+    if progArgs['logging']:
+        logging.basicConfig(filename='rbn.log', filemode='w',
+                            level=logging.INFO)
+
+    while True:
+        try:
+            tn = telnetlib.Telnet()
+            telnetInstance = tn
+            
+            tn.set_debuglevel(progArgs['telnetdebug'])
+            print(f"Connecting...")
+            tn.open(RBN_HOST, RBN_PORT, 10)
+
+            rbnLogin(tn)
+
+            rbnProcess(tn, progArgs)
+
+            
+        except EOFError as e:
+            print(f"connection failed: {e}")
+            print("retrying")
+        finally:
+            tn.close()
 
 
 
