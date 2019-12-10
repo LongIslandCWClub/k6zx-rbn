@@ -8,6 +8,7 @@ import logging
 import os
 import re
 import signal
+import sqlite3
 import sys
 import telnetlib
 
@@ -88,6 +89,9 @@ def parseArguments():
     parser.add_argument('--cwops', action='store', dest='cwops',
                         default='amateur-radio/clubs/cwops.txt',
                         help='CWOps Callsign file')
+    parser.add_argument('--skcc', action='store', dest='skcc',
+                        default='SKCCLogger/SKCCData_DB.sql',
+                        help='SKCCLogger local membership database')
 
     args = parser.parse_args()
 
@@ -143,6 +147,11 @@ def processArgs(args):
         a['cwops'] = args.cwops
     else:
         a['cwops'] = os.path.join(os.environ['HOME'], args.cwops)
+
+    if os.path.isabs(args.skcc):
+        a['skcc'] = args.skcc
+    else:
+        a['skcc'] = os.path.join(os.environ['HOME'], args.skcc)
         
     return a
 
@@ -387,7 +396,18 @@ def getCallsigns(file):
                 callsigns.append(line.strip())
 
     return callsigns
-            
+
+
+def getSQLCallsigns(db):
+    conn = sqlite3.connect(db)
+    c = conn.cursor()
+
+    lst = []
+    for row in c.execute('SELECT Mbr_Call from SKCCData_DB'):
+        lst.append(row[0])
+
+    return lst
+    
     
 
 def rbnLogin(tn):
@@ -401,7 +421,7 @@ def rbnLogin(tn):
     print("Connection established...")
 
 
-def rbnProcess(tn, args, callLst):
+def rbnProcess(tn, args, callLst, skccCallLst):
     dots = 0
     columns, rows = os.get_terminal_size(0)
     columns -= 10
@@ -432,20 +452,30 @@ def rbnProcess(tn, args, callLst):
                 sys.stdout.write("\033[K")     # clear to eol
                 dots = 0
 
-            found = False
+            friendFound = False
             for call in callLst:
                 # rg = re.escape(call) + f"\s+de"
-                rg = re.escape(call)
+                rg = re.escape(call) + '\s+de'
                 # print(f"{rg} --- {line}")
                 if re.search(rg, line):
-                    found = True
+                    friendFound = True
                     # print(f"\n\nfound callsign: {call}")
                     
                     break
 
-            if found:
-                # print(colorama.Back.YELLOW + line + colorama.Style.RESET_ALL)
-                print(colorama.Back.GREEN + line + colorama.Style.RESET_ALL)
+            skccFound = False
+            if not friendFound:
+                for call in skccCallLst:
+                    # rg = re.escape(call)
+                    rg = re.escape(call) + '\s+de'
+                    if re.search(rg, line):
+                        skccFound = True
+                        break
+
+            if friendFound:
+                print(colorama.Back.GREEN + line)
+            elif skccFound:
+                print(colorama.Back.CYAN + line)
             else:
                 print(line)
 
@@ -464,9 +494,21 @@ def main():
     licwCallsigns = getCallsigns(progArgs['licw'])
     cwopsCallsigns = getCallsigns(progArgs['cwops'])
     callsigns = licwCallsigns + cwopsCallsigns
-    # print(f"DEBUG\n{callsigns}")
 
-    colorama.init()
+    skccCallsigns = getSQLCallsigns(progArgs['skcc'])
+    
+
+    colorama.init(autoreset=True)
+
+    # DEBUG
+    # print(colorama.Back.BLUE + 'testing...')
+    # print(colorama.Back.RED + 'testing...')
+    # print(colorama.Back.GREEN + 'testing...')
+    # print(colorama.Back.YELLOW + 'testing...')
+    # print(colorama.Back.CYAN + 'testing...')
+    # print(colorama.Back.MAGENTA + 'testing...')
+    # print(colorama.Back.YELLOW + 'testing...')
+    # print(colorama.Back.YELLOW + 'testing...')
     
     while True:
         try:
@@ -479,7 +521,7 @@ def main():
 
             rbnLogin(tn)
 
-            rbnProcess(tn, progArgs, callsigns)
+            rbnProcess(tn, progArgs, callsigns, skccCallsigns)
             
         except EOFError as e:
             print(colorama.Fore.RED + f"Connection failed: {e}" +
