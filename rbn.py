@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 
+import colorama
 import configargparse
 from geopy import distance
 import logging
@@ -81,6 +82,12 @@ def parseArguments():
                         help='Select transmission mode')
     parser.add_argument('-f', '--config-file', action='store', dest='configFile',
                         is_config_file=True, help='Config file path')
+    parser.add_argument('--licw', action='store', dest='licw', type=str,
+                        default='amateur-radio/clubs/licw.txt',
+                        help='LICW Callsign file')
+    parser.add_argument('--cwops', action='store', dest='cwops',
+                        default='amateur-radio/clubs/cwops.txt',
+                        help='CWOps Callsign file')
 
     args = parser.parse_args()
 
@@ -128,7 +135,15 @@ def processArgs(args):
         a['mode'] = args.mode
     a['logging'] = args.logging
     a['telnetdebug'] = args.telnetdebug
-    
+    if os.path.isabs(args.licw):
+        a['licw'] = args.licw
+    else:
+        a['licw'] = os.path.join(os.environ['HOME'], args.licw)
+    if os.path.isabs(args.cwops):
+        a['cwops'] = args.cwops
+    else:
+        a['cwops'] = os.path.join(os.environ['HOME'], args.cwops)
+        
     return a
 
 
@@ -326,7 +341,7 @@ def filter(progArgs, qrz, line):
             filterWPM(progArgs, wpm) and
             filterMaidenhead(progArgs, dxCallData)
             ):
-            retStr = (f"{dxCall:6s} de {deCall:6s}  {freq:7.1f} MHz  {mode}  "
+            retStr = (f"{dxCall:8s} de {deCall:6s}  {freq:7.1f} MHz  {mode}  "
                       f"{snr:>2s} dB  {wpm:>2s} WPM  {time}")
 
             if 'lat' in dxCallData and 'lon' in dxCallData:
@@ -355,6 +370,26 @@ def filter(progArgs, qrz, line):
         return retStr
 
 
+def getCallsigns(file):
+    callsigns = []
+    with open(file) as f:
+        while True:
+            line = f.readline()
+            if not line:
+                # EOF
+                break
+            elif line.startswith('#'):
+                # if line is a comment, skip
+                continue
+            elif not line.strip():
+                continue
+            else:
+                callsigns.append(line.strip())
+
+    return callsigns
+            
+    
+
 def rbnLogin(tn):
     tn.open(RBN_HOST, RBN_PORT, 10)
     
@@ -366,7 +401,7 @@ def rbnLogin(tn):
     print("Connection established...")
 
 
-def rbnProcess(tn, args):
+def rbnProcess(tn, args, callLst):
     dots = 0
     columns, rows = os.get_terminal_size(0)
     columns -= 10
@@ -396,9 +431,23 @@ def rbnProcess(tn, args):
                 print("", end="\r")            # carriage return
                 sys.stdout.write("\033[K")     # clear to eol
                 dots = 0
-                
-            print(line)
-            
+
+            found = False
+            for call in callLst:
+                # rg = re.escape(call) + f"\s+de"
+                rg = re.escape(call)
+                # print(f"{rg} --- {line}")
+                if re.search(rg, line):
+                    found = True
+                    # print(f"\n\nfound callsign: {call}")
+                    
+                    break
+
+            if found:
+                # print(colorama.Back.YELLOW + line + colorama.Style.RESET_ALL)
+                print(colorama.Back.GREEN + line + colorama.Style.RESET_ALL)
+            else:
+                print(line)
 
 
 def main():
@@ -407,12 +456,18 @@ def main():
     args = parseArguments()
 
     progArgs = processArgs(args)
-    print(f"DEBUG - progArgs: {progArgs}")
 
     if progArgs['logging']:
         logging.basicConfig(filename='rbn.log', filemode='w',
                             level=logging.INFO)
 
+    licwCallsigns = getCallsigns(progArgs['licw'])
+    cwopsCallsigns = getCallsigns(progArgs['cwops'])
+    callsigns = licwCallsigns + cwopsCallsigns
+    # print(f"DEBUG\n{callsigns}")
+
+    colorama.init()
+    
     while True:
         try:
             tn = telnetlib.Telnet()
@@ -424,12 +479,12 @@ def main():
 
             rbnLogin(tn)
 
-            rbnProcess(tn, progArgs)
-
+            rbnProcess(tn, progArgs, callsigns)
             
         except EOFError as e:
-            print(f"connection failed: {e}")
-            print("retrying")
+            print(colorama.Fore.RED + f"Connection failed: {e}" +
+                  colorama.Style.RESET_ALL)
+            print("Retrying...")
         finally:
             tn.close()
 
