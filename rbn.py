@@ -155,6 +155,19 @@ def processArgs(args):
         
     return a
 
+def filterFriend(args, dxCall, licwLst, line):
+    result = False
+
+    for call in licwLst:
+        rg = re.escape(call) + '\s+de'
+        if re.search(rg, line):
+            result = True
+            break
+
+    return result
+
+        
+    
 
 # Check if freq of spot lines within a band specified 
 def filterBand(args, freq):
@@ -292,7 +305,7 @@ def filterMaidenhead(args, callData):
     return result
 
 
-def filter(progArgs, qrz, line):
+def filter(progArgs, qrz, licwLst, line):
     global lastCall
     global lastTime
     
@@ -344,38 +357,49 @@ def filter(progArgs, qrz, line):
                 print(f"\nfilter() caught exception '{e}' for callsign {dxCall}")
                 callsignFound = False
 
-        if (callsignFound and
-            filterBand(progArgs, freq) and
-            filterMode(progArgs, mode) and
-            filterWPM(progArgs, wpm) and
-            filterMaidenhead(progArgs, dxCallData)
-            ):
-            retStr = (f"{dxCall:8s} de {deCall:6s}  {freq:7.1f} MHz  {mode}  "
-                      f"{snr:>2s} dB  {wpm:>2s} WPM  {time}")
+        retStr = ""
+        printData = False
+        if callsignFound:
+            if filterFriend(progArgs, dxCall, licwLst, lineStr):
+                printData = True
+            elif (filterBand(progArgs, freq) and
+                  filterMode(progArgs, mode) and
+                  filterWPM(progArgs, wpm) and
+                  filterMaidenhead(progArgs, dxCallData)):
+                printData = True
 
-            if 'lat' in dxCallData and 'lon' in dxCallData:
-                d = distance.distance((dxCallData['lat'], dxCallData['lon']),
-                                      BREA_POSITION).miles
-                retStr += f"  dist {round(d):5} mi"
+            
+        # if (callsignFound and
+            # filterFriend(progArgs, dxCall, licwLst, lineStr) or
+            # filterBand(progArgs, freq) and
+            # filterMode(progArgs, mode) and
+            # filterWPM(progArgs, wpm) and
+            # filterMaidenhead(progArgs, dxCallData)
+            #):
+            if printData:
+                retStr = (f"{dxCall:8s} de {deCall:6s}  {freq:7.1f} MHz  {mode}  "
+                          f"{snr:>2s} dB  {wpm:>2s} WPM  {time}")
 
-            if 'state' in dxCallData:
-                retStr += f"  {dxCallData['state']}"
-            elif 'country' in dxCallData:
-                retStr += f"  {dxCallData['country']}"
+                if 'lat' in dxCallData and 'lon' in dxCallData:
+                    d = distance.distance((dxCallData['lat'], dxCallData['lon']),
+                                          BREA_POSITION).miles
+                    retStr += f"  dist {round(d):5} mi"
 
-            if (lastCall == dxCall) and (lastTime == time):
-                retStr = '*'
+                if 'state' in dxCallData:
+                    retStr += f"  {dxCallData['state']}"
+                elif 'country' in dxCallData:
+                    retStr += f"  {dxCallData['country']}"
 
-            lastCall = dxCall
-            lastTime = time
+                if (lastCall == dxCall) and (lastTime == time):
+                    retStr = '*'
 
-            if progArgs['logging']:
-                logging.info(f"call {dxCall} - {lastCall} "
-                             f"time {time} - {lastTime}")
+                lastCall = dxCall
+                lastTime = time
+
+                if progArgs['logging']:
+                    logging.info(f"call {dxCall} - {lastCall} "
+                                 f"time {time} - {lastTime}")
                 
-        else:
-            retStr = ""
-
         return retStr
 
 
@@ -421,7 +445,7 @@ def rbnLogin(tn):
     print("Connection established...")
 
 
-def rbnProcess(tn, args, callLst, skccCallLst):
+def rbnProcess(tn, args, licwCallLst, skccCallLst):
     dots = 0
     columns, rows = os.get_terminal_size(0)
     columns -= 10
@@ -430,7 +454,7 @@ def rbnProcess(tn, args, callLst, skccCallLst):
     
     while True:
         rawline = tn.read_until(b"\r\n")
-        line = filter(args, qrz, rawline)
+        line = filter(args, qrz, licwCallLst, rawline)
         if line == '*' or line == "":
             if dots >= columns:
                 # goto to beginning of line and clear the line
@@ -453,7 +477,7 @@ def rbnProcess(tn, args, callLst, skccCallLst):
                 dots = 0
 
             friendFound = False
-            for call in callLst:
+            for call in licwCallLst:
                 # rg = re.escape(call) + f"\s+de"
                 rg = re.escape(call) + '\s+de'
                 # print(f"{rg} --- {line}")
@@ -487,13 +511,15 @@ def main():
 
     progArgs = processArgs(args)
 
+    print(progArgs)
+
     if progArgs['logging']:
         logging.basicConfig(filename='rbn.log', filemode='w',
                             level=logging.INFO)
 
     licwCallsigns = getCallsigns(progArgs['licw'])
     cwopsCallsigns = getCallsigns(progArgs['cwops'])
-    callsigns = licwCallsigns + cwopsCallsigns
+    licwCallsigns = licwCallsigns + cwopsCallsigns
 
     skccCallsigns = getSQLCallsigns(progArgs['skcc'])
     
@@ -521,7 +547,7 @@ def main():
 
             rbnLogin(tn)
 
-            rbnProcess(tn, progArgs, callsigns, skccCallsigns)
+            rbnProcess(tn, progArgs, licwCallsigns, skccCallsigns)
             
         except EOFError as e:
             print(colorama.Fore.RED + f"Connection failed: {e}" +
