@@ -444,6 +444,13 @@ def rbnLogin(tn):
     tn.read_until(b"Local users", timeout=20)
     print("Connection established...")
 
+    while True:
+        s = tn.read_until(b"\r\n")
+        if re.match('^K6ZX', s.decode('utf-8')):
+            print("Receiving RBN Data...")
+            break;
+
+
 
 def rbnProcess(tn, args, licwCallLst, skccCallLst):
     dots = 0
@@ -511,8 +518,9 @@ def main():
 
     progArgs = processArgs(args)
 
-    print(progArgs)
-
+    # DEBUG
+    # print(progArgs)
+    
     if progArgs['logging']:
         logging.basicConfig(filename='rbn.log', filemode='w',
                             level=logging.INFO)
