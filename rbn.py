@@ -336,20 +336,33 @@ def filter(progArgs, qrz, licwLst, line):
                          f"{snr} dB, {wpm} WPM, {time}Z")
 
         if qrz.localCallsignDataExists(dxCall):
-            dxCallData = qrz.getLocalCallsignData(dxCall)
-            callsignFound = True
-            if progArgs['logging']:
-                logging.info(f"filter() ")
+            if dxCall == MY_CALLSIGN:
+                callData = qrz.getLocalCallsignData(deCall)
+                callsignFound = True
+                if progArgs['logging']:
+                    logging.info(f"filter() ")
+            else:
+                callData = qrz.getLocalCallsignData(dxCall)
+                callsignFound = True
+                if progArgs['logging']:
+                    logging.info(f"filter() ")
         else:
             try:
-                dxCallData = qrz.callsignData(dxCall, quiet=True)
-                callsignFound = True
-                qrz.setLocalCallsignData(dxCall, dxCallData)
-                if progArgs['logging']:
-                    logging.info(f"callsignData: {dxCallData}")
+                if dxCall == MY_CALLSIGN:
+                    callData = qrz.callsignData(deCall, quiet=True)
+                    callsignFound = True
+                    qrz.setLocalCallsignData(deCall, callData)
+                    if progArgs['logging']:
+                        logging.info(f"callsignData: {callData}")
+                else:
+                    callData = qrz.callsignData(dxCall, quiet=True)
+                    callsignFound = True
+                    qrz.setLocalCallsignData(dxCall, callData)
+                    if progArgs['logging']:
+                        logging.info(f"callsignData: {callData}")
 
-                if 'grid' not in dxCallData:
-                    logging.info(f"{dxCallData['call']} has no grid in QRZ")
+                if 'grid' not in callData:
+                    logging.info(f"{callData['call']} has no grid in QRZ")
                 
             except CallsignNotFound:
                 callsignFound = False
@@ -365,30 +378,22 @@ def filter(progArgs, qrz, licwLst, line):
             elif (filterBand(progArgs, freq) and
                   filterMode(progArgs, mode) and
                   filterWPM(progArgs, wpm) and
-                  filterMaidenhead(progArgs, dxCallData)):
+                  filterMaidenhead(progArgs, callData)):
                 printData = True
 
-            
-        # if (callsignFound and
-            # filterFriend(progArgs, dxCall, licwLst, lineStr) or
-            # filterBand(progArgs, freq) and
-            # filterMode(progArgs, mode) and
-            # filterWPM(progArgs, wpm) and
-            # filterMaidenhead(progArgs, dxCallData)
-            #):
             if printData:
                 retStr = (f"{dxCall:8s} de {deCall:6s}  {freq:7.1f} MHz  {mode}  "
                           f"{snr:>2s} dB  {wpm:>2s} WPM  {time}")
 
-                if 'lat' in dxCallData and 'lon' in dxCallData:
-                    d = distance.distance((dxCallData['lat'], dxCallData['lon']),
+                if 'lat' in callData and 'lon' in callData:
+                    d = distance.distance((callData['lat'], callData['lon']),
                                           BREA_POSITION).miles
                     retStr += f"  dist {round(d):5} mi"
 
-                if 'state' in dxCallData:
-                    retStr += f"  {dxCallData['state']}"
-                elif 'country' in dxCallData:
-                    retStr += f"  {dxCallData['country']}"
+                if 'state' in callData:
+                    retStr += f"  {callData['state']}"
+                elif 'country' in callData:
+                    retStr += f"  {callData['country']}"
 
                 if (lastCall == dxCall) and (lastTime == time):
                     retStr = '*'
@@ -444,6 +449,12 @@ def rbnLogin(tn):
     tn.read_until(b"Local users", timeout=20)
     print("Connection established...")
 
+    while True:
+        s = tn.read_until(b"\r\n")
+        if re.match(rf"^{MY_CALLSIGN}", s.decode('utf-8')):
+            print("Receiving RBN Data...")
+            break;
+    
 
 def rbnProcess(tn, args, licwCallLst, skccCallLst):
     dots = 0
