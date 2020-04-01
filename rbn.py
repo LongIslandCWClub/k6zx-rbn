@@ -451,6 +451,7 @@ def rbnLogin(tn):
 
     while True:
         s = tn.read_until(b"\r\n")
+
         if re.match(rf"^{MY_CALLSIGN}", s.decode('utf-8')):
             print("Receiving RBN Data...")
             break;
@@ -522,8 +523,9 @@ def main():
 
     progArgs = processArgs(args)
 
-    print(progArgs)
-
+    # DEBUG
+    # print(progArgs)
+    
     if progArgs['logging']:
         logging.basicConfig(filename='rbn.log', filemode='w',
                             level=logging.INFO)
