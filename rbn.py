@@ -488,19 +488,22 @@ def rbnProcess(tn, args, licwCallLst, skccCallLst):
                 sys.stdout.write("\033[K")     # clear to eol
                 dots = 0
 
+            meFound = False
+            if re.match(MY_CALLSIGN, line):
+                meFound = True
+                
             friendFound = False
-            for call in licwCallLst:
-                # rg = re.escape(call) + f"\s+de"
-                rg = re.escape(call) + '\s+de'
-                # print(f"{rg} --- {line}")
-                if re.search(rg, line):
-                    friendFound = True
-                    # print(f"\n\nfound callsign: {call}")
-                    
-                    break
+            if not meFound:
+                for call in licwCallLst:
+                    rg = re.escape(call) + '\s+de'
+                    # print(f"{rg} --- {line}")
+                    if re.search(rg, line):
+                        friendFound = True
+                        # print(f"\n\nfound callsign: {call}")
+                        break
 
             skccFound = False
-            if not friendFound:
+            if (not friendFound) or (not meFound):
                 for call in skccCallLst:
                     # rg = re.escape(call)
                     rg = re.escape(call) + '\s+de'
@@ -508,7 +511,9 @@ def rbnProcess(tn, args, licwCallLst, skccCallLst):
                         skccFound = True
                         break
 
-            if friendFound:
+            if meFound:
+                print(colorama.Back.YELLOW + line)
+            elif friendFound:
                 print(colorama.Back.GREEN + line)
             elif skccFound:
                 print(colorama.Back.CYAN + line)
@@ -546,8 +551,8 @@ def main():
     # print(colorama.Back.YELLOW + 'testing...')
     # print(colorama.Back.CYAN + 'testing...')
     # print(colorama.Back.MAGENTA + 'testing...')
-    # print(colorama.Back.YELLOW + 'testing...')
-    # print(colorama.Back.YELLOW + 'testing...')
+
+    exit
     
     while True:
         try:
