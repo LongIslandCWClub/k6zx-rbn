@@ -38,12 +38,14 @@ class QRZ:
         # open shelve file with QRZ callsign info storage
         self.QRZ_SHELVE_FILE = os.path.join(os.environ['HOME'],
                                             'amateur-radio/rbnData.db')
-        self.qrzLocalData = shelve.open(self.QRZ_SHELVE_FILE)
+        self.qrzLocalData = shelve.open(self.QRZ_SHELVE_FILE, flag='n')
 
 
-    # Class destructor, need to close the shelve file
+    # Class destructor, need to close and remove the shelve file
     def __del__(self):
         self.qrzLocalData.close()
+
+        
 
 
     def _get_session(self):
@@ -131,6 +133,7 @@ class QRZ:
         if self.logging:
             # logging.info(f"setLocalCallsignData() {data}")
             logging.info(f"setLocalCallsignData() set data for {callsign}")
+        # print(f"setLocalCallsignData() set data {callsign}: {data}")
         self.qrzLocalData[callsign] = data
         
 

@@ -4,6 +4,7 @@
 import colorama
 import configargparse
 from geopy import distance
+from inspect import currentframe, getframeinfo
 import logging
 import os
 import re
@@ -367,7 +368,9 @@ def filter(progArgs, qrz, licwLst, line):
             except CallsignNotFound:
                 callsignFound = False
             except Exception as e:
-                print(f"\nfilter() caught exception '{e}' for callsign {dxCall}")
+                frameinfo = getframeinfo(currentframe())
+                print(f"\nfilter() caught exception '{e}' for callsign {dxCall}, "
+                      f"{frameinfo.filename}: {frameinfo.lineno}")
                 callsignFound = False
 
         retStr = ""
