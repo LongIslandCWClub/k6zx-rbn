@@ -19,14 +19,8 @@ from qrz import *
 
 RBN_HOST = "telnet.reversebeacon.net"
 RBN_PORT = 7000
-MY_CALLSIGN = "K6ZX"
 
 TELNETLIB_DEBUG_LEVEL = 0
-
-QRZ_USERNAME   = 'K6ZX'
-QRZ_PASSWORD   = 'Sean!12233'
-
-BREA_POSITION = (33.9165, -117.9003)
 
 telnetInstance = None
 
@@ -60,6 +54,8 @@ def parseArguments():
 
     parser.add_argument('-b', '--band', action='append', dest='band',
                         help='Display stations only on these bands')
+    parser.add_argument('-c', '--callsign', action='store', dest='callsign',
+                        type=str, help="Specify user's callsign")
     parser.add_argument('-l', '--logging', action='store', dest='logging',
                         type=int, default = 0, help='Enable program logging')
     parser.add_argument('--telnetdebug', action='store', dest='telnetdebug',
@@ -68,9 +64,9 @@ def parseArguments():
                         help='DE Maidenhead squares')
     parser.add_argument('--dx_maid', action='append', dest='dxMaid',
                         help='DX Maidenhead squares')
-    parser.add_argument('--de_itu', action='store', dest='deITU',
+    parser.add_argument('--de_ituzone', action='append', dest='deITUZone',
                         type=int, help='DE ITU Zone')
-    parser.add_argument('--dx_itu', action='store', dest='dxITU',
+    parser.add_argument('--dx_ituzone', action='append', dest='dxITUZone',
                         type=int, help='DX ITU Zone')
     parser.add_argument('--de_cq', action='append', dest='deCQ',
                         help='DE CQ Zone')
@@ -84,15 +80,28 @@ def parseArguments():
                         help='Select transmission mode')
     parser.add_argument('-f', '--config-file', action='store', dest='configFile',
                         is_config_file=True, help='Config file path')
-    parser.add_argument('--licw', action='store', dest='licw', type=str,
+    parser.add_argument('--licw-file', action='store', dest='licwFile', type=str,
                         default='amateur-radio/clubs/licw.txt',
                         help='LICW Callsign file')
     parser.add_argument('--cwops', action='store', dest='cwops',
                         default='amateur-radio/clubs/cwops.txt',
                         help='CWOps Callsign file')
-    parser.add_argument('--skcc', action='store', dest='skcc',
+    parser.add_argument('--skcc-file', action='store', dest='skccFile',
                         default='SKCCLogger/SKCCData_DB.sql',
                         help='SKCCLogger local membership database')
+    parser.add_argument('--qrz_username', action='store', dest='qrzUsername',
+                        type=str, help='QRZ username')
+    parser.add_argument('--qrz_password', action='store', dest='qrzPassword',
+                        type=str, help='QRZ password')
+    parser.add_argument('--latitude', action='store', dest='latitude',
+                        type=float, help='Station latitude')
+    parser.add_argument('--longitude', action='store', dest='longitude',
+                        type=float, help='Station longitude')
+    parser.add_argument('--skcc', action='store_true', dest='skcc',
+                        help='Highlight SKCC members')
+    parser.add_argument('--licw', action='store_true', dest='licw',
+                        help='Highlight LICW members')
+
 
     args = parser.parse_args()
 
@@ -114,47 +123,106 @@ def processArgs(args):
                      '6m']
     else:
         a['band'] = args.band
+
     if not args.deMaid:
         a['deMaid'] = ['all']
     else:
         a['deMaid'] = args.deMaid
+        
     if not args.dxMaid:
         a['dxMaid'] = ['all']
     else:
         a['dxMaid'] = args.dxMaid
-    a['deITU'] = args.deITU
-    a['dxITU'] = args.dxITU
+        
+    if not args.deITUZone:
+        a['deITUZone'] = ['all']
+    else:
+        a['deITUZone'] = args.deITUZone
+
+    if not args.dxITUZone:
+        a['dxITUZone'] = ['all']
+    else:
+        a['dxITUZone'] = args.dxITUZone
+        
     if not args.deCQ:
         a['deCQ'] = ['all']
     else:
         a['deCQ'] = args.deCQ
+        
     if not args.dxCQ:
         a['dxCQ'] = ['all']
     else:
         a['dxCQ'] = args.dxCQ
+        
     a['minWPM'] = args.minWPM
     a['maxWPM'] = args.maxWPM
+    
     if not args.mode:
         a['mode'] = ['CW', 'RTTY', 'PSK31', 'PSK63', 'BPSK', 'FT8', 'FT4']
     else:
         a['mode'] = args.mode
+        
     a['logging'] = args.logging
     a['telnetdebug'] = args.telnetdebug
-    if os.path.isabs(args.licw):
-        a['licw'] = args.licw
+    
+    if os.path.isabs(args.licwFile):
+        a['licwFile'] = args.licwFile
     else:
-        a['licw'] = os.path.join(os.environ['HOME'], args.licw)
+        a['licwFile'] = os.path.join(os.environ['HOME'], args.licwFile)
+        
     if os.path.isabs(args.cwops):
         a['cwops'] = args.cwops
     else:
         a['cwops'] = os.path.join(os.environ['HOME'], args.cwops)
 
-    if os.path.isabs(args.skcc):
-        a['skcc'] = args.skcc
+    if os.path.isabs(args.skccFile):
+        a['skccFile'] = args.skccFile
     else:
-        a['skcc'] = os.path.join(os.environ['HOME'], args.skcc)
-        
+        a['skccFile'] = os.path.join(os.environ['HOME'], args.skccFile)
+
+    if args.callsign:
+        a['callsign'] = args.callsign
+    else:
+        print("ERROR: the user's callsign is not provided, exiting...")
+        sys.exit(1)
+
+    if args.qrzUsername:
+        a['qrzUsername'] = args.qrzUsername
+    else:
+        print("ERROR: the user's QRZ callsign is not provided, exiting...")
+        sys.exit(1)
+
+    if args.qrzPassword:
+        a['qrzPassword'] = args.qrzPassword
+    else:
+        print("ERROR: the user's QRZ password is not provided, exiting...")
+        sys.exit(1)
+
+    a['position'] = []
+    if args.latitude:
+        a['position'].append(args.latitude)
+    else:
+        print("ERROR: the station's latitude is not provided, exiting...")
+        sys.exit(1)
+
+    if args.longitude:
+        a['position'].append(args.longitude)
+    else:
+        print("ERROR: the station's longitude is not provided, exiting...")
+        sys.exit(1)
+
+    if args.skcc:
+        a['skcc'] = True
+    else:
+        a['skcc'] = False
+
+    if args.licw:
+        a['licw'] = True
+    else:
+        a['licw'] = False
+
     return a
+
 
 def filterFriend(args, dxCall, licwLst, line):
     result = False
@@ -292,10 +360,19 @@ def filterCQZones(args, callData):
     return result
 
 
+def filterITUZones(args, callData):
+    result = False
+
+    result = True   # temporary
+    return result
+
+
 def filterMaidenhead(args, callData):
     result = False
 
-    if 'grid' in callData:
+    if 'all' in args['dxMaid']:
+        result = True
+    elif 'grid' in callData:
         grid = callData['grid'][:2]
         if grid in args['dxMaid']:
             result = True
@@ -337,25 +414,41 @@ def filter(progArgs, qrz, licwLst, line):
                          f"{snr} dB, {wpm} WPM, {time}Z")
 
         if qrz.localCallsignDataExists(dxCall):
-            if dxCall == MY_CALLSIGN:
+            # The callsign data exists in the local shelve file, so this
+            # station has been heard during this session. This is an
+            # optimization to minimize QRZ traffic that has already been
+            # retrieved.
+            if dxCall == progArgs['callsign']:
+                # if the received DX callsign is user's callsign, then get the
+                # data for the DE callsign, to get distance from the DE callsign
+                # to user's location
                 callData = qrz.getLocalCallsignData(deCall)
                 callsignFound = True
                 if progArgs['logging']:
                     logging.info(f"filter() ")
             else:
+                # else, the usual case, get the data for the DX station,
+                # to get the distance from the DX station to the user's
+                # location
                 callData = qrz.getLocalCallsignData(dxCall)
                 callsignFound = True
                 if progArgs['logging']:
                     logging.info(f"filter() ")
         else:
+            # The callsign data isn't in the local shelve file, so must
+            # go to QRZ to retrieve that station's information
             try:
-                if dxCall == MY_CALLSIGN:
+                if dxCall == progArgs['callsign']:
+                    # user's callsign, get data for DE callsign so
+                    # distance is from DE station to user's location
                     callData = qrz.callsignData(deCall, quiet=True)
                     callsignFound = True
                     qrz.setLocalCallsignData(deCall, callData)
                     if progArgs['logging']:
                         logging.info(f"callsignData: {callData}")
                 else:
+                    # get DX station's data to get distance from DX to
+                    # user's location
                     callData = qrz.callsignData(dxCall, quiet=True)
                     callsignFound = True
                     qrz.setLocalCallsignData(dxCall, callData)
@@ -376,12 +469,17 @@ def filter(progArgs, qrz, licwLst, line):
         retStr = ""
         printData = False
         if callsignFound:
+            # If information about the callsign is found, then do the
+            # filtering based on the criteria from the configuration
+            # file, and print only those records from RBN that pass
+            # those filters.
             if filterFriend(progArgs, dxCall, licwLst, lineStr):
                 printData = True
             elif (filterBand(progArgs, freq) and
                   filterMode(progArgs, mode) and
                   filterWPM(progArgs, wpm) and
-                  filterMaidenhead(progArgs, callData)):
+                  filterMaidenhead(progArgs, callData) and
+                  filterITUZones(progArgs, callData)):
                 printData = True
 
             if printData:
@@ -390,7 +488,7 @@ def filter(progArgs, qrz, licwLst, line):
 
                 if 'lat' in callData and 'lon' in callData:
                     d = distance.distance((callData['lat'], callData['lon']),
-                                          BREA_POSITION).miles
+                                          progArgs['position']).miles
                     retStr += f"  dist {round(d):5} mi"
 
                 if 'state' in callData:
@@ -442,11 +540,11 @@ def getSQLCallsigns(db):
     
     
 
-def rbnLogin(tn):
+def rbnLogin(tn, args):
     tn.open(RBN_HOST, RBN_PORT, 10)
     
     tn.read_until(b"Please enter your call: ")
-    loginStr = (MY_CALLSIGN + "\n").encode('ascii')
+    loginStr = (args['callsign'] + "\n").encode('ascii')
     tn.write(loginStr)
 
     tn.read_until(b"Local users", timeout=20)
@@ -455,7 +553,7 @@ def rbnLogin(tn):
     while True:
         s = tn.read_until(b"\r\n")
 
-        if re.match(rf"^{MY_CALLSIGN}", s.decode('utf-8')):
+        if re.match(rf"^{args['callsign']}", s.decode('utf-8')):
             print("Receiving RBN Data...")
             break;
     
@@ -465,7 +563,7 @@ def rbnProcess(tn, args, licwCallLst, skccCallLst):
     columns, rows = os.get_terminal_size(0)
     columns -= 10
 
-    qrz = QRZ(QRZ_USERNAME, QRZ_PASSWORD, args['logging'])
+    qrz = QRZ(args['qrzUsername'], args['qrzPassword'], args['logging'])
     
     while True:
         rawline = tn.read_until(b"\r\n")
@@ -492,27 +590,31 @@ def rbnProcess(tn, args, licwCallLst, skccCallLst):
                 dots = 0
 
             meFound = False
-            if re.match(MY_CALLSIGN, line):
+            if re.match(args['callsign'], line):
                 meFound = True
-                
-            friendFound = False
-            if not meFound:
-                for call in licwCallLst:
-                    rg = re.escape(call) + '\s+de'
-                    # print(f"{rg} --- {line}")
-                    if re.search(rg, line):
-                        friendFound = True
-                        # print(f"\n\nfound callsign: {call}")
-                        break
 
+            # Highlight LICW members only if that option is enabled
+            friendFound = False
+            if args['licw']:
+                if not meFound:
+                    for call in licwCallLst:
+                        rg = re.escape(call) + '\s+de'
+                        # print(f"{rg} --- {line}")
+                        if re.search(rg, line):
+                            friendFound = True
+                            # print(f"\n\nfound callsign: {call}")
+                            break
+
+            # Highlight SKCC members only if enabled
             skccFound = False
-            if (not friendFound) or (not meFound):
-                for call in skccCallLst:
-                    # rg = re.escape(call)
-                    rg = re.escape(call) + '\s+de'
-                    if re.search(rg, line):
-                        skccFound = True
-                        break
+            if args['skcc']:
+                if (not friendFound) or (not meFound):
+                    for call in skccCallLst:
+                        # rg = re.escape(call)
+                        rg = re.escape(call) + '\s+de'
+                        if re.search(rg, line):
+                            skccFound = True
+                            break
 
             if meFound:
                 print(colorama.Back.YELLOW + line)
@@ -532,17 +634,17 @@ def main():
     progArgs = processArgs(args)
 
     # DEBUG
-    # print(progArgs)
+    print(progArgs)
     
     if progArgs['logging']:
         logging.basicConfig(filename='rbn.log', filemode='w',
                             level=logging.INFO)
 
-    licwCallsigns = getCallsigns(progArgs['licw'])
+    licwCallsigns = getCallsigns(progArgs['licwFile'])
     cwopsCallsigns = getCallsigns(progArgs['cwops'])
     licwCallsigns = licwCallsigns + cwopsCallsigns
 
-    skccCallsigns = getSQLCallsigns(progArgs['skcc'])
+    skccCallsigns = getSQLCallsigns(progArgs['skccFile'])
     
 
     colorama.init(autoreset=True)
@@ -554,8 +656,7 @@ def main():
     # print(colorama.Back.YELLOW + 'testing...')
     # print(colorama.Back.CYAN + 'testing...')
     # print(colorama.Back.MAGENTA + 'testing...')
-
-    exit
+    # sys.exit(0)
     
     while True:
         try:
@@ -566,7 +667,7 @@ def main():
             print(f"Connecting...")
             tn.open(RBN_HOST, RBN_PORT, 10)
 
-            rbnLogin(tn)
+            rbnLogin(tn, progArgs)
 
             rbnProcess(tn, progArgs, licwCallsigns, skccCallsigns)
             
