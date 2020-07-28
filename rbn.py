@@ -65,13 +65,13 @@ def parseArguments():
     parser.add_argument('--dx_maid', action='append', dest='dxMaid',
                         help='DX Maidenhead squares')
     parser.add_argument('--de_ituzone', action='append', dest='deITUZone',
-                        type=int, help='DE ITU Zone')
+                        type=str, help='DE ITU Zone')
     parser.add_argument('--dx_ituzone', action='append', dest='dxITUZone',
-                        type=int, help='DX ITU Zone')
-    parser.add_argument('--de_cq', action='append', dest='deCQ',
-                        help='DE CQ Zone')
-    parser.add_argument('--dx_cq', action='append', dest='dxCQ',
-                        help='DX CQ Zone')
+                        type=str, help='DX ITU Zone')
+    parser.add_argument('--de_cqzone', action='append', dest='deCQZone',
+                        type=str, help='DE CQ Zone')
+    parser.add_argument('--dx_cqzone', action='append', dest='dxCQZone',
+                        type=str, help='DX CQ Zone')
     parser.add_argument('--min_wpm', action='store', dest='minWPM',
                         type=int, default=0, help='Minimum CW WPM to show')
     parser.add_argument('--max_wpm', action='store', dest='maxWPM',
@@ -144,15 +144,15 @@ def processArgs(args):
     else:
         a['dxITUZone'] = args.dxITUZone
         
-    if not args.deCQ:
-        a['deCQ'] = ['all']
+    if not args.deCQZone:
+        a['deCQZone'] = ['all']
     else:
-        a['deCQ'] = args.deCQ
+        a['deCQZone'] = args.deCQZone
         
-    if not args.dxCQ:
-        a['dxCQ'] = ['all']
+    if not args.dxCQZone:
+        a['dxCQZone'] = ['all']
     else:
-        a['dxCQ'] = args.dxCQ
+        a['dxCQZone'] = args.dxCQZone
         
     a['minWPM'] = args.minWPM
     a['maxWPM'] = args.maxWPM
@@ -327,73 +327,99 @@ def filterWPM(args, wpmStr):
     return result
 
 
-def filterCQZones(args, callData):
-    result = False
+def filterMaidenhead(args, dxCallData, deCallData):
+    dxGrid = False
+    deGrid = False
 
-    if 'cqzone' in callData:
-        # print(f"filterCQZones() {args['dxCQ']}")
-        # print(f"\tcq zone: {callData['cqzone']}")
-
-        # need to convert from string to int to match zone types in the
-        # progArgs dxCQ list
-        zone = int(callData['cqzone'])
-
-        if args['logging']:
-            logging.info(f"calldata cqzone type {type(callData['cqzone'])}, "
-                         f"args dxCQ type {type(args['dxCQ'])}, "
-                         f"args elem type {type(args['dxCQ'][0])}")
-        
-        if zone in args['dxCQ']:
-            result = True
-        else:
-            if args['logging']:
-                logging.info(f"filterCQZones(): cfg CQ zone {args['dxCQ']} "
-                             f"CQ zone {zone}")
-            else:
-                pass
-    else:
-        result = True          # this call doesn't have a CQ Zone so print it
-        result = False         # on second thought too many stations w/o zone
-        if args['logging']:
-            logging.info(f"filterCQZones(): station has no 'cqzone'")
-        
-    return result
-
-
-def filterITUZones(args, callData):
-    result = False
-
-    result = True   # temporary
-    return result
-
-
-def filterMaidenhead(args, callData):
-    result = False
+    if 'all' in args['dxMaid'] and 'all' in args['deMaid']:
+        return True
 
     if 'all' in args['dxMaid']:
-        result = True
-    elif 'grid' in callData:
-        grid = callData['grid'][:2]
-        if grid in args['dxMaid']:
-            result = True
+        dxGrid = True
+    elif dxCallData is not None:
+        if 'grid' in dxCallData:
+            if dxCallData['grid'][:2] in args['dxMaid']:
+                dxGrid = True
+
+    if 'all' in args['deMaid']:
+        deGrid = True
+    elif deCallData is not None:
+        if 'grid' in deCallData:
+            if deCallData['grid'][:2] in args['deMaid']:
+                deGrid = True
+
+    if dxGrid and deGrid:
+        return True
     else:
-        if args['logging']:
-            logging.info(f"filterMaidenhead() {callData['call']} has no grid")
-
-    return result
+        return False
 
 
+def filterITUZones(args, dxCallData, deCallData):
+    dxITU = False
+    deITU = False
+
+    if 'all' in args['dxITUZone'] and 'all' in args['deITUZone']:
+        return True
+
+    if 'all' in args['dxITUZone']:
+        dxITU = True
+    elif dxCallData is not None:
+        if 'ituzone' in dxCallData:
+            if dxCallData['ituzone'] in args['dxITUZone']:
+                dxITU = True
+
+    if 'all' in args['deITUZone']:
+        deITU = True
+    elif deCallData is not None:
+        if 'ituzone' in deCallData:
+            if deCallData['ituzone'] in args['deITUZone']:
+                dxITU = True
+
+    if dxITU and deITU:
+        return True
+    else:
+        return False
+
+
+def filterCQZones(args, dxCallData, deCallData):
+    dxCQZone = False
+    deCQZone = False
+
+    if 'all' in args['dxCQZone'] and 'all' in args['deCQZone']:
+        return True
+
+    if 'all' in args['dxCQZone']:
+        dxCQZone = True
+    elif dxCallData is not None:
+        if 'cqzone' in dxCallData:
+            if dxCallData['cqzone'] in args['dxCQZone']:
+                dxCQZone = True
+
+    if 'all' in args['deCQZone']:
+        deCQZone = True
+    elif deCallData is not None:
+        if 'cqzone' in deCallData:
+            if deCallData['cqzone'] in args['deCQZone']:
+                deCQZone = True
+
+    if dxCQZone and deCQZone:
+        return True
+    else:
+        return False
+
+
+ 
 def filter(progArgs, qrz, licwLst, line):
     global lastCall
     global lastTime
     
     lineStr = line.decode('utf-8').rstrip()
 
+    # Extract information from RBN line
     l = lineStr.split()
-
     if len(l) == 12:
         if progArgs['logging']:
-            logging.info("-------------------------------")
+            # logging.info("-------------------------------")
             logging.info(f"split: {l}")
 
         try:
@@ -413,89 +439,44 @@ def filter(progArgs, qrz, licwLst, line):
             logging.info(f"DEBUG: {dxCall} de {deCall}, freq {freq}, {mode}, "
                          f"{snr} dB, {wpm} WPM, {time}Z")
 
-        if qrz.localCallsignDataExists(dxCall):
-            # The callsign data exists in the local shelve file, so this
-            # station has been heard during this session. This is an
-            # optimization to minimize QRZ traffic that has already been
-            # retrieved.
-            if dxCall == progArgs['callsign']:
-                # if the received DX callsign is user's callsign, then get the
-                # data for the DE callsign, to get distance from the DE callsign
-                # to user's location
-                callData = qrz.getLocalCallsignData(deCall)
-                callsignFound = True
-                if progArgs['logging']:
-                    logging.info(f"filter() ")
-            else:
-                # else, the usual case, get the data for the DX station,
-                # to get the distance from the DX station to the user's
-                # location
-                callData = qrz.getLocalCallsignData(dxCall)
-                callsignFound = True
-                if progArgs['logging']:
-                    logging.info(f"filter() ")
-        else:
-            # The callsign data isn't in the local shelve file, so must
-            # go to QRZ to retrieve that station's information
-            try:
-                if dxCall == progArgs['callsign']:
-                    # user's callsign, get data for DE callsign so
-                    # distance is from DE station to user's location
-                    callData = qrz.callsignData(deCall, quiet=True)
-                    callsignFound = True
-                    qrz.setLocalCallsignData(deCall, callData)
-                    if progArgs['logging']:
-                        logging.info(f"callsignData: {callData}")
-                else:
-                    # get DX station's data to get distance from DX to
-                    # user's location
-                    callData = qrz.callsignData(dxCall, quiet=True)
-                    callsignFound = True
-                    qrz.setLocalCallsignData(dxCall, callData)
-                    if progArgs['logging']:
-                        logging.info(f"callsignData: {callData}")
+        dxCallData = qrz.getCallsignData(dxCall, progArgs)
+        deCallData = qrz.getCallsignData(deCall, progArgs)
 
-                if 'grid' not in callData:
-                    logging.info(f"{callData['call']} has no grid in QRZ")
-                
-            except CallsignNotFound:
-                callsignFound = False
-            except Exception as e:
-                frameinfo = getframeinfo(currentframe())
-                print(f"\nfilter() caught exception '{e}' for callsign {dxCall}, "
-                      f"{frameinfo.filename}: {frameinfo.lineno}")
-                callsignFound = False
+        if progArgs['logging']:
+            logging.info("-------------------------------------------------------")
+            logging.info(f"dxCallData: {dxCallData}")
+            logging.info(f"deCallData: {deCallData}")
 
         retStr = ""
         printData = False
-        if callsignFound:
-            # If information about the callsign is found, then do the
-            # filtering based on the criteria from the configuration
-            # file, and print only those records from RBN that pass
-            # those filters.
+        if dxCallData is not None:
+            # Callsign data was retrieved from qrz.com, so filter the
+            # RBN line based on the criteria from the configuration
+            # file
             if filterFriend(progArgs, dxCall, licwLst, lineStr):
                 printData = True
             elif (filterBand(progArgs, freq) and
                   filterMode(progArgs, mode) and
                   filterWPM(progArgs, wpm) and
-                  filterMaidenhead(progArgs, callData) and
-                  filterITUZones(progArgs, callData)):
+                  filterMaidenhead(progArgs, dxCallData, deCallData) and
+                  filterITUZones(progArgs, dxCallData, deCallData) and
+                  filterCQZones(progArgs, dxCallData, deCallData)):
                 printData = True
 
             if printData:
                 retStr = (f"{dxCall:8s} de {deCall:6s}  {freq:7.1f} MHz  {mode}  "
                           f"{snr:>2s} dB  {wpm:>2s} WPM  {time}")
 
-                if 'lat' in callData and 'lon' in callData:
-                    d = distance.distance((callData['lat'], callData['lon']),
+                if 'lat' in dxCallData and 'lon' in dxCallData:
+                    d = distance.distance((dxCallData['lat'], dxCallData['lon']),
                                           progArgs['position']).miles
                     retStr += f"  dist {round(d):5} mi"
 
-                if 'state' in callData:
-                    retStr += f"  {callData['state']}"
-                elif 'country' in callData:
-                    retStr += f"  {callData['country']}"
-
+                if 'state' in dxCallData:
+                    retStr += f"  {dxCallData['state']}"
+                elif 'country' in dxCallData:
+                    retStr += f"  {dxCallData['country']}"
+                
                 if (lastCall == dxCall) and (lastTime == time):
                     retStr = '*'
 
@@ -507,6 +488,7 @@ def filter(progArgs, qrz, licwLst, line):
                                  f"time {time} - {lastTime}")
                 
         return retStr
+        
 
 
 def getCallsigns(file):
@@ -590,31 +572,26 @@ def rbnProcess(tn, args, licwCallLst, skccCallLst):
                 dots = 0
 
             meFound = False
+            friendFound = False
+            skccFound = False
             if re.match(args['callsign'], line):
                 meFound = True
 
-            # Highlight LICW members only if that option is enabled
-            friendFound = False
-            if args['licw']:
-                if not meFound:
-                    for call in licwCallLst:
-                        rg = re.escape(call) + '\s+de'
-                        # print(f"{rg} --- {line}")
-                        if re.search(rg, line):
-                            friendFound = True
-                            # print(f"\n\nfound callsign: {call}")
-                            break
-
-            # Highlight SKCC members only if enabled
-            skccFound = False
-            if args['skcc']:
-                if (not friendFound) or (not meFound):
-                    for call in skccCallLst:
-                        # rg = re.escape(call)
-                        rg = re.escape(call) + '\s+de'
-                        if re.search(rg, line):
-                            skccFound = True
-                            break
+            if args['licw'] and not meFound:
+                # Highlight LICW members
+                for call in licwCallLst:
+                    rg = re.escape(call) + '\s+de'
+                    if re.search(rg, line):
+                        friendFound = True
+                        break
+                    
+            if args['skcc'] and (not meFound or not friendFound):
+                # Highlight SKCC members only if enabled
+                for call in skccCallLst:
+                    rg = re.escape(call) + '\s+de'
+                    if re.search(rg, line):
+                        skccFound = True
+                        break
 
             if meFound:
                 print(colorama.Back.YELLOW + line)
@@ -634,7 +611,7 @@ def main():
     progArgs = processArgs(args)
 
     # DEBUG
-    print(progArgs)
+    # print(progArgs)
     
     if progArgs['logging']:
         logging.basicConfig(filename='rbn.log', filemode='w',
@@ -645,7 +622,6 @@ def main():
     licwCallsigns = licwCallsigns + cwopsCallsigns
 
     skccCallsigns = getSQLCallsigns(progArgs['skccFile'])
-    
 
     colorama.init(autoreset=True)
 

@@ -3,6 +3,7 @@
 # qrz.py - Functions to query the QRZ.com database
 
 
+from inspect import currentframe, getframeinfo
 import logging
 import os
 import re
@@ -63,7 +64,7 @@ class QRZ:
         raise Exception('could not get QRZ session')
 
 
-    def callsignData(self, callsign, retry=True, quiet=False):
+    def getQRZCallsignData(self, callsign, retry=True, quiet=False):
         if self._session_key is None:
             self._get_session()
 
@@ -127,6 +128,29 @@ class QRZ:
             # logging.info(f"getLocalCallsignData() {self.qrzLocalData[callsign]}")
             logging.info(f"getLocalCallsignData() get call {callsign}")
         return self.qrzLocalData[callsign]
+
+
+    def getCallsignData(self, callsign, args):
+        if self.localCallsignDataExists(callsign):
+            # callsign data has already been retrieved from qrz.com
+            # and is in the local shelve file
+            callData = self.getLocalCallsignData(callsign)
+        else:
+            # callsign data hasn't been retrieved from qrz.com so get it
+            try:
+                callData = self.getQRZCallsignData(callsign, quiet=True)
+                self.setLocalCallsignData(callsign, callData)
+            except Exception as e:
+                # frameinfo = getframeinfo(currentframe())
+                # print(f"\nfilter() caught exception '{e}' for callsign {callsign}, "
+                #       f"{frameinfo.filename}: {frameinfo.lineno}")
+                return None
+                
+        # if args['logging']:
+        #     logging.info(f"callsignData: {callData}")
+
+        return callData
+                
 
 
     def setLocalCallsignData(self, callsign, data):
