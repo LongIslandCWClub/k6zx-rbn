@@ -348,6 +348,17 @@ def filterMaidenhead(args, dxCallData, deCallData):
             if deCallData['grid'][:2] in args['deMaid']:
                 deGrid = True
 
+    if args['logging']:
+        if (dxCallData is not None) and ('grid' in dxCallData):
+            logging.info(f"filterMaidenhead() dxMaid: {dxCallData['grid']}")
+        else:
+            logging.info("filterMaidenhead() dxMaid not present")
+
+        if (deCallData is not None) and ('grid' in deCallData):
+            logging.info(f"filterMaidenhead() deMaid: {deCallData['grid']}")
+        else:
+            logging.info("filterMaidenhead() deMaid not present")
+
     if dxGrid and deGrid:
         return True
     else:
@@ -375,6 +386,17 @@ def filterITUZones(args, dxCallData, deCallData):
             if deCallData['ituzone'] in args['deITUZone']:
                 dxITU = True
 
+    if args['logging']:
+        if (dxCallData is not None) and ('ituzone' in dxCallData):
+            logging.info(f"filterITUZones() dxITUZone: {dxCallData['ituzone']}")
+        else:
+            logging.info("filterITUZone() dxITUZone not present")
+
+        if (deCallData is not None) and ('ituzone' in deCallData):
+            logging.info(f"filterITUZones() deITUZone: {deCallData['ituzone']}")
+        else:
+            logging.info("filterITUZone() deITUZone not present")
+            
     if dxITU and deITU:
         return True
     else:
@@ -402,6 +424,17 @@ def filterCQZones(args, dxCallData, deCallData):
             if deCallData['cqzone'] in args['deCQZone']:
                 deCQZone = True
 
+    if args['logging']:
+        if (dxCallData is not None) and ('cqzone' in dxCallData):
+            logging.info(f"filterCQZones() dxCQZone: {dxCallData['cqzone']}")
+        else:
+            logging.info("filterCQZone() dxCQZone not present")
+
+        if (deCallData is not None) and ('cqzone' in deCallData):
+            logging.info(f"filterCQZones() deCQZone: {deCallData['cqzone']}")
+        else:
+            logging.info("filterCQZone() deCQZone not present")
+            
     if dxCQZone and deCQZone:
         return True
     else:
