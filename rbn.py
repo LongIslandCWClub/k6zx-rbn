@@ -8,6 +8,7 @@ from inspect import currentframe, getframeinfo
 import logging
 import os
 import re
+import shutil
 import signal
 import sqlite3
 import sys
@@ -24,6 +25,7 @@ TELNETLIB_DEBUG_LEVEL = 0
 
 telnetInstance = None
 
+DEFAULT_CONFIG_FILE = 'rbn.cfg'
 
 lastCall = ""
 lastTime = ""
@@ -52,6 +54,8 @@ def parseArguments():
     parser = configargparse.ArgumentParser(description='RBN spot filter program.',
                                            epilog=p)
 
+    parser.add_argument('--init', action='store', dest='init',
+                        help='Initialize rbn configuration files') 
     parser.add_argument('-b', '--band', action='append', dest='band',
                         help='Display stations only on these bands')
     parser.add_argument('-c', '--callsign', action='store', dest='callsign',
@@ -117,6 +121,8 @@ def parseArguments():
 def processArgs(args):
     a = {}
 
+    a['init'] = args.init
+    
     # if no bands are configured then want to return all bands
     if not args.band:
         a['band'] = ['160m', '80m', '40m', '20m', '17m', '15m', '12m', '10m',
@@ -180,36 +186,37 @@ def processArgs(args):
     else:
         a['skccFile'] = os.path.join(os.environ['HOME'], args.skccFile)
 
-    if args.callsign:
-        a['callsign'] = args.callsign
-    else:
-        print("ERROR: the user's callsign is not provided, exiting...")
-        sys.exit(1)
+    if args.init is None:
+        if args.callsign:
+            a['callsign'] = args.callsign
+        else:
+            print("ERROR: the user's callsign is not provided, exiting...")
+            sys.exit(1)
 
-    if args.qrzUsername:
-        a['qrzUsername'] = args.qrzUsername
-    else:
-        print("ERROR: the user's QRZ callsign is not provided, exiting...")
-        sys.exit(1)
+        if args.qrzUsername:
+            a['qrzUsername'] = args.qrzUsername
+        else:
+            print("ERROR: the user's QRZ callsign is not provided, exiting...")
+            sys.exit(1)
 
-    if args.qrzPassword:
-        a['qrzPassword'] = args.qrzPassword
-    else:
-        print("ERROR: the user's QRZ password is not provided, exiting...")
-        sys.exit(1)
+        if args.qrzPassword:
+            a['qrzPassword'] = args.qrzPassword
+        else:
+            print("ERROR: the user's QRZ password is not provided, exiting...")
+            sys.exit(1)
 
-    a['position'] = []
-    if args.latitude:
-        a['position'].append(args.latitude)
-    else:
-        print("ERROR: the station's latitude is not provided, exiting...")
-        sys.exit(1)
+        a['position'] = []
+        if args.latitude:
+            a['position'].append(args.latitude)
+        else:
+            print("ERROR: the station's latitude is not provided, exiting...")
+            sys.exit(1)
 
-    if args.longitude:
-        a['position'].append(args.longitude)
-    else:
-        print("ERROR: the station's longitude is not provided, exiting...")
-        sys.exit(1)
+        if args.longitude:
+            a['position'].append(args.longitude)
+        else:
+            print("ERROR: the station's longitude is not provided, exiting...")
+            sys.exit(1)
 
     if args.skcc:
         a['skcc'] = True
@@ -222,6 +229,39 @@ def processArgs(args):
         a['licw'] = False
 
     return a
+
+
+def initRbn(args):
+    # Initialize rbn by creating a default configuration file in the
+    # directory specified
+
+    absPath = os.path.abspath(args['init'])
+
+    if not os.path.exists(absPath):
+        ans = input(f"The directory '{absPath}' does not exist, "
+                    "Create it (y or n)? ")
+        if ans == 'y' or ans == 'Y':
+            os.mkdir(absPath)
+        else:
+            print(f"Directory not created, exiting...")
+            sys.exit(0)
+    else:
+        print(f"The directory '{absPath}' exists.")
+
+    print('Creating configuration file...')
+
+    # Check if script is running from pyinstaller 'bundle' or is just
+    # running from source. The default config file is located in a
+    # different directory in these two cases. This must be coordinated
+    # with the pyinstaller build process using the '--add-data'
+    # directive so that files are accessed from the temporary
+    # directive.
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        srcPath = f"{sys._MEIPASS}/data/{DEFAULT_CONFIG_FILE}"
+    else:
+        srcPath = DEFAULT_CONFIG_FILE
+
+    shutil.copy(srcPath, absPath)
 
 
 def filterFriend(args, dxCall, licwLst, line):
@@ -643,8 +683,9 @@ def main():
 
     progArgs = processArgs(args)
 
-    # DEBUG
-    # print(progArgs)
+    if progArgs['init'] is not None:
+        initRbn(progArgs)
+        sys.exit(0)
     
     if progArgs['logging']:
         logging.basicConfig(filename='rbn.log', filemode='w',

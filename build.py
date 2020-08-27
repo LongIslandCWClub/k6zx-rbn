@@ -96,6 +96,14 @@ def buildLinux(args):
     if args['onefile']:
         cmd += ' --onefile'
 
+    # Add default rbn.cfg file to bundle. This adds the default config
+    # file to the pyinstaller bundle. When the executable file is
+    # executed, a temporary directory is created and any files that
+    # are added using the pyinstaller '--add-data' directive, will be
+    # extracted into the subdirectory specified. This must be
+    # coordinated in the application so it can access these files.
+    cmd += ' --add-data rbn.cfg:data'
+
     if args['workpath']:
         p = os.path.join(f"{args['workpath']}", 'linux')
         cmd += f" --workpath {p}"
