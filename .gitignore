@@ -6,4 +6,5 @@
 venv
 *.log
 *.spec
+*.html
 __pycache__

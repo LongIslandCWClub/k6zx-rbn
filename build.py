@@ -9,6 +9,9 @@
 #
 # $ env PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install 3.8.5
 #
+# Normal invocation of this build script is:
+#   $ ./build.py -o -d ../rbnapp/dist -w ../rbn/build build ./rbn.py
+# 
 
 
 import configargparse
