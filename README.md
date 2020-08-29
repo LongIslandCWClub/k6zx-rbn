@@ -45,11 +45,11 @@ location. This is the added functionality provided by the **rbn**
 package over and above what is available from RBN. 
 
 This repository contains the source code of the **rbn** package. It
-has been tested on the following operating systems[^1]:
+has been tested on the following operating systems:
 
 - Linux
 
-[^1]: Testing on MacOS and Windows 10 is planned for the future.
+*Note: Testing on MacOS and Windows 10 is planned for the future.*
 
 
 <a name="installation"></a>
