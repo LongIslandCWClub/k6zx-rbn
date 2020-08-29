@@ -71,8 +71,9 @@ Python Version Management Tool,
 modules are installed in the local virtual environment. In this way
 the entire required python support system is available locally. The
 required python modules are identified in the file 'requirements.txt'
-and are installed in the local virtual environment using *pip install
--r requirements.txt*. 
+and are installed in the local virtual environment using:
+
+    pip install -r requirements.txt*. 
 
 It would also be possible to use the python interpreter and required
 packages installed on the system. This must be a python 3 version,
@@ -80,23 +81,77 @@ python 2 is not supported. The additional python packages will need to
 be installed also using the package management system of the OS in
 question. 
 
-HERE HERE
+The **rbn** package runs in a terminal session and is invoked from the
+command line. Its operation is configured with either a configuration
+file or optional command line arguments. While either way is
+effective, using a configuration file is probably the easiest method
+of use. A default configuration file can be written using:
 
-**cwwords** can perform initialization of its data files and
-configuration files. This is done with the following invocation: 
+    rbn.py --init <config_dir>
 
-  $ cwwords.py --init <config_dir>
-  
-  where <config_dir> is a directory in which the program's
-  configuration files are stored. 
-  
-There are several default configuration files that are written to this
-directory that contain the configuration parameters for each of the
-modes of operation of **cwwords**. 
-
+ where *config_dir* is a directory in which the program's
+ configuration file is stored.
 
 <a name="invocation"></a>
 ## Invocation
 
-The **cwwords** package 
+The **rbn** package is invoked as follows:
+
+```
+usage: rbn.py [-h] [--init INIT] [-b BAND] [-c CALLSIGN] [-l LOGGING] [--telnetdebug TELNETDEBUG]
+              [--de_maid DEMAID] [--dx_maid DXMAID] [--de_ituzone DEITUZONE] [--dx_ituzone DXITUZONE]
+              [--de_cqzone DECQZONE] [--dx_cqzone DXCQZONE] [--min_wpm MINWPM] [--max_wpm MAXWPM]
+              [-m MODE] [-f CONFIGFILE] [--licw-file LICWFILE] [--cwops CWOPS] [--skcc-file SKCCFILE]
+              [--qrz_username QRZUSERNAME] [--qrz_password QRZPASSWORD] [--latitude LATITUDE]
+              [--longitude LONGITUDE] [--skcc] [--licw]
+
+RBN spot filter program. Args that start with '--' (eg. --init) can also be set in a config file
+(specified via -f). Config file syntax allows: key=value, flag=true, stuff=[a,b,c] (for details, see
+syntax at https://goo.gl/R74nmi). If an arg is specified in more than one place, then commandline
+values override config file values which override defaults.
+
+optional arguments:  
+  -h, --help            show this help message and exit  
+  --init INIT           Initialize rbn configuration files  
+  -b BAND, --band BAND  Display stations only on these bands  
+  -c CALLSIGN, --callsign CALLSIGN  
+                        Specify user's callsign  
+  -l LOGGING, --logging LOGGING  
+                        Enable program logging  
+  --telnetdebug TELNETDEBUG  
+                        Enable telnetlib debugging  
+  --de_maid DEMAID      DE Maidenhead squares  
+  --dx_maid DXMAID      DX Maidenhead squares  
+  --de_ituzone DEITUZONE  
+                        DE ITU Zone  
+  --dx_ituzone DXITUZONE  
+                        DX ITU Zone  
+  --de_cqzone DECQZONE  DE CQ Zone  
+  --dx_cqzone DXCQZONE  DX CQ Zone  
+  --min_wpm MINWPM      Minimum CW WPM to show  
+  --max_wpm MAXWPM      Maximum CW WPM to show  
+  -m MODE, --mode MODE  Select transmission mode  
+  -f CONFIGFILE, --config-file CONFIGFILE  
+                        Config file path  
+  --licw-file LICWFILE  LICW Callsign file  
+  --cwops CWOPS         CWOps Callsign file  
+  --skcc-file SKCCFILE  SKCCLogger local membership database  
+  --qrz_username QRZUSERNAME  
+                        QRZ username  
+  --qrz_password QRZPASSWORD  
+                        QRZ password  
+  --latitude LATITUDE   Station latitude  
+  --longitude LONGITUDE  
+                        Station longitude  
+  --skcc                Highlight SKCC members  
+  --licw                Highlight LICW members  
+
+Telnet to Reverse Beacon Network (RBN) server and capture CW spots. This program provides better
+(IMHO) filtering of these spots. Provide the filtering parameters as command line arguments or in a
+config file.
+```
+
+
+
+
 
