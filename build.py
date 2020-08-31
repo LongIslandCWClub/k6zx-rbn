@@ -10,7 +10,7 @@
 # $ env PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install 3.8.5
 #
 # Normal invocation of this build script is:
-#   $ ./build.py -o -d ../rbnapp/dist -w ../rbn/build build ./rbn.py
+#   $ ./build.py -o ../rbnapp build ./rbn.py
 # 
 
 
@@ -34,18 +34,17 @@ def parseArguments():
     parser = configargparse.ArgumentParser(description='Build python executable.',
                                            epilog=p)
 
-    parser.add_argument('--distpath', '-d', action='store', dest='distpath',
-                        type=str, help='Path to bundled application')
-    parser.add_argument('--workpath', '-w', action='store', dest='workpath',
-                        type=str, help='Path to temporary work files')
+    # Positional arguments
+    parser.add_argument('appdir', action='store', type=str,
+                        help='Directory where compiled executable is stored')
 
-    parser.add_argument('command', action='store',
-                        type=str, help='Command to run (build, clean)')
+    parser.add_argument('command', action='store', type=str,
+                        help='Command to run (build, clean)')
 
-    parser.add_argument('script', action='store',
-                        type=str,
+    parser.add_argument('script', action='store', type=str,
                         help='Python script for which application is built')
 
+    # Optional arguments
     parser.add_argument('--onefile', '-o', action='store_true', dest='onefile',
                         help='Build application in one, bundled file')
 
@@ -66,15 +65,8 @@ def processArgs(args):
 
     a['script'] = os.path.abspath(args['script'])
 
-    if args['distpath']:
-        a['distpath'] = os.path.abspath(args['distpath'])
-    else:
-        a['distpath'] = args['distpath']
-
-    if args['workpath']:
-        a['workpath'] = os.path.abspath(args['workpath'])
-    else:
-        a['workpath'] = args['workpath']
+    a['appdir'] = os.path.abspath(args['appdir'])
+    a['builddir'] = os.path.join(a['appdir'], 'build')
 
     a['onefile'] = args['onefile']
 
@@ -88,13 +80,10 @@ def removeDir(dirPath):
         print(f"ERROR: {dirPath}, {e.strerror}")
             
 
-def buildLinux(args):
-    if os.path.exists(args['workpath']):
-        removeDir(args['workpath'])
+def buildUnix(args, osType):
+    if os.path.exists(args['builddir']):
+        removeDir(args['builddir'])
 
-    if os.path.exists(args['distpath']):
-        removeDir(args['distpath'])
-    
     cmd = "pyinstaller"
     if args['onefile']:
         cmd += ' --onefile'
@@ -107,20 +96,29 @@ def buildLinux(args):
     # coordinated in the application so it can access these files.
     cmd += ' --add-data rbn.cfg:data'
 
-    if args['workpath']:
-        p = os.path.join(f"{args['workpath']}", 'linux')
-        cmd += f" --workpath {p}"
-
-    if args['distpath']:
-        p = os.path.join(f"{args['distpath']}", 'linux')
-        cmd += f" --distpath {p}"
-
+    pyDistPath = os.path.join(f"{args['builddir']}", 'dist')
+    pyWorkPath = os.path.join(f"{args['builddir']}", 'build')
+    
+    cmd += f" --distpath {pyDistPath}"
+    cmd += f" --workpath {pyWorkPath}"
+    
     cmd += f" {args['script']}"
     # print(f"buildLinux() cmd: {cmd}")
-    
+
     os.system(cmd)
 
-    print(f"The resulting executable is located in: {p}")
+    appName = os.path.splitext(os.path.basename(args['script']))[0]
+    appPath = os.path.join(args['appdir'], osType, appName)
+    destDir = os.path.join(args['appdir'], osType)
+    destPath = os.path.join(destDir, appName)
+
+    if not os.path.exists(destDir):
+        os.mkdir(destDir)
+
+    cmd = f"cp -p {appPath} {destDir}"
+    os.system(cmd)
+                 
+    print(f"The resulting executable is located in: {destPath}")
     
 
 def main():
@@ -135,22 +133,16 @@ def main():
 
     if progArgs['command'] == 'build':
         if opSys == 'Linux':
-            buildLinux(progArgs)
+            buildUnix(progArgs, 'linux')
+        elif opSys == 'Darwin':
+            buildUnix(progArgs, 'macos')
         elif opSys == 'Windows':
             buildWindows(progArgs)
-        elif opSys == 'MacOS':
-            buildMacOS(progArgs)
         else:
             print(f"ERROR: requested build for unknown OS: {opSys}")
     elif progArgs['command'] == 'clean':
         print(f"Cleaning {progArgs['script']} application build...")
-        if not progArgs['distpath']:
-            progArgs['distpath'] = os.path.abspath("./dist")
-        if not progArgs['workpath']:
-            progArgs['workpath'] = os.path.abspath("./build")
-
-        removeDir(progArgs['distpath'])
-        removeDir(progArgs['workpath'])
+        removeDir(progArgs['builddir'])
 
         fileLst = glob.glob(f"{os.path.abspath('.')}/*.spec")
         for f in fileLst:
