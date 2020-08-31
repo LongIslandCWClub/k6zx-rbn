@@ -103,12 +103,11 @@ def buildUnix(args, osType):
     cmd += f" --workpath {pyWorkPath}"
     
     cmd += f" {args['script']}"
-    # print(f"buildLinux() cmd: {cmd}")
 
     os.system(cmd)
 
     appName = os.path.splitext(os.path.basename(args['script']))[0]
-    appPath = os.path.join(args['appdir'], osType, appName)
+    appPath = os.path.join(args['appdir'], "build", "dist", appName)
     destDir = os.path.join(args['appdir'], osType)
     destPath = os.path.join(destDir, appName)
 
