@@ -691,11 +691,17 @@ def main():
         logging.basicConfig(filename='rbn.log', filemode='w',
                             level=logging.INFO)
 
-    licwCallsigns = getCallsigns(progArgs['licwFile'])
-    cwopsCallsigns = getCallsigns(progArgs['cwops'])
-    licwCallsigns = licwCallsigns + cwopsCallsigns
+    if progArgs['licw']:
+        licwCallsigns = getCallsigns(progArgs['licwFile'])
+        cwopsCallsigns = getCallsigns(progArgs['cwops'])
+        licwCallsigns = licwCallsigns + cwopsCallsigns
+    else:
+        licwCallsigns = None
 
-    skccCallsigns = getSQLCallsigns(progArgs['skccFile'])
+    if progArgs['skcc']:
+        skccCallsigns = getSQLCallsigns(progArgs['skccFile'])
+    else:
+        skccCallsigns = None
 
     colorama.init(autoreset=True)
 
