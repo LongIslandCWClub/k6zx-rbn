@@ -537,13 +537,13 @@ def filter(progArgs, qrz, licwLst, line):
                 printData = True
 
             if printData:
-                retStr = (f"{dxCall:8s} de {deCall:6s}  {freq:7.1f} MHz  {mode}  "
-                          f"{snr:>2s} dB  {wpm:>2s} WPM  {time}")
+                retStr = (f"{dxCall:8s} de {deCall:6s}  {freq:>7.1f} MHz  {mode}  "
+                          f"{snr:>2s} dB  {wpm:>2s}   {time}")
 
                 if 'lat' in dxCallData and 'lon' in dxCallData:
                     d = distance.distance((dxCallData['lat'], dxCallData['lon']),
                                           progArgs['position']).miles
-                    retStr += f"  dist {round(d):5} mi"
+                    retStr += f"  {round(d):5} mi"
 
                 if 'state' in dxCallData:
                     retStr += f"  {dxCallData['state']}"
@@ -611,20 +611,36 @@ def rbnLogin(tn, args):
         if re.match(rf"^{args['callsign']}", s.decode('utf-8')):
             print("Receiving RBN Data...")
             break;
+
+
+def printHeader(cols):
+    print("\nDX          DE       freq            snr    wpm  time    dist to me")
+    count = 0
+    while (count < cols):
+        print("=", end='')
+        count += 1
+    print()
     
 
 def rbnProcess(tn, args, licwCallLst, skccCallLst):
     dots = 0
-    columns, rows = os.get_terminal_size(0)
-    columns -= 10
+    columns, rows = shutil.get_terminal_size()
+    dotCols = columns - 10
+    rowsCount = 0
 
     qrz = QRZ(args['qrzUsername'], args['qrzPassword'], args['logging'])
+
+    printHeader(columns)
     
     while True:
+        if rowsCount > (rows - 7):
+            printHeader(columns)
+            rowsCount = 0
+            
         rawline = tn.read_until(b"\r\n")
         line = filter(args, qrz, licwCallLst, rawline)
         if line == '*' or line == "":
-            if dots >= columns:
+            if dots >= dotCols:
                 # goto to beginning of line and clear the line
                 print("", end="\r")            # carriage return
                 sys.stdout.write("\033[K")     # clear to eol
@@ -668,12 +684,16 @@ def rbnProcess(tn, args, licwCallLst, skccCallLst):
 
             if meFound:
                 print(colorama.Back.YELLOW + line)
+                rowsCount += 1
             elif friendFound:
                 print(colorama.Back.GREEN + line)
+                rowsCount += 1
             elif skccFound:
                 print(colorama.Back.CYAN + line)
+                rowsCount += 1
             else:
                 print(line)
+                rowsCount += 1
 
 
 def main():
